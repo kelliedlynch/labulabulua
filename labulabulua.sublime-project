@@ -1,0 +1,16 @@
+{
+	"folders":
+	[
+		{
+			"path": "/Users/kellie/Documents/GameDev/LabuLabuLua"
+		}
+	],
+	"build_systems":
+	[
+		{
+			"name": "Run",
+			"working_path": "$project_path",
+			"cmd": ["sh", "./run.sh"]
+		}
+	]
+}
