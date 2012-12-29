@@ -47,6 +47,31 @@ local function nextNode(conv, currentKey)
     return currentKey, conv[currentKey]
 end
 
+local function displayBackground( img )
+	if img == "" then
+		return nil
+	end
+	local spriteTexture = MOAITexture.new ( )
+	spriteTexture:load ( "Resources/Images/"..img )
+	local texX, texY = spriteTexture:getSize()
+	-- use screen height to determine scale
+	local scaleFactor = texY / 480
+	texX = texX / scaleFactor
+	texY = texY / scaleFactor
+
+	local gfxQuad = MOAIGfxQuad2D.new ()
+	gfxQuad:setTexture ( spriteTexture )
+	gfxQuad:setRect ( -160 , 240 , 160 , -240  )
+	gfxQuad:setUVRect ( 0, 0, 1, 1 )
+
+	local prop = MOAIProp2D.new ()
+	prop:setDeck ( gfxQuad )
+
+	bgLayer:insertProp ( prop )
+
+	return prop
+end
+
 local function drawSpeakerNameBox(name)
 	if name == "" then
 		return nil
@@ -81,8 +106,13 @@ local function drawMainTextBox(text)
 		return nil
 	else
 		if not mainTextBG then
-			local gradient1 = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
-			local mainTextBG = Meshes2D.newRect( -150 , -230 , 300 , 150 , gradient1 )
+			local gradient 
+			if _currentNode.boxStyle == "thought" then
+				gradient = Meshes2D.newGradient( "#AACC00", "#AA99FF", 45 )
+			else
+				gradient = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
+			end
+			local mainTextBG = Meshes2D.newRect( -150 , -230 , 300 , 150 , gradient )
 			convoLayer:insertProp( mainTextBG )
 			print("bg ", mainTextBG:getPriority())
 		end
@@ -123,7 +153,6 @@ local function displaySpeakerSprite( img )
 
 	local prop = MOAIProp2D.new ()
 	prop:setDeck ( gfxQuad )
-	prop:setPriority(10)
 
 	spriteLayer:insertProp ( prop )
 
@@ -148,13 +177,7 @@ end
 local function goToNode(n)
 	clearNode()
 	_currentNodeKey , _currentNode = n , script[n]
-	-- for k,v in pairs(_currentNode) do
-	-- 	print(k,v)
-	-- end
-	-- for k,v in pairs(_currentNode.getItem) do
-	-- 	print(k,v)
-	-- end
-	--local foo = replaceVariables(_currentNode.text)
+	background = displayBackground(_currentNode.background)
 	speakerNameBox = drawSpeakerNameBox(_currentNode.speaker)
 	speakerTextBox = drawMainTextBox(replaceVariables(_currentNode.text))
 	speakerSprite = displaySpeakerSprite( _currentNode.portrait )
@@ -165,17 +188,11 @@ local function goToNode(n)
 end
 
 local function displayChoices ( self ) 
-	for k,v in pairs(_currentNode.choices) do
-		-- for kk, vv in pairs(v) do
-		-- 	print(kk , vv)
-		-- end
-	end
 	require "LLMenu"
 	makeMenu(_currentNode.choices)
 end
 
 local function getItem(item, qty)
-	--print("get item", item)
 	table.insert (Player.items , { [item] = 1, })
 	for k,v in pairs(Player.items) do
 		for k,v in pairs(v) do
@@ -189,14 +206,6 @@ local function setVar(variable, value)
 end
 
 local function advanceTextbox(box)
-	-- for k,v in pairs(_currentNode) do
-	-- 	print(k,v)
-	-- end
-	-- if(_currentNode.getItem) then
-	-- 	for k,v in pairs(_currentNode.getItem) do
-	-- 		print(k,v)
-	-- 	end
-	-- end
 	if box:isBusy () then
 		box:stop()
 		box:revealAll()

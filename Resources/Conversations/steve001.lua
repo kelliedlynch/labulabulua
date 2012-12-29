@@ -2,6 +2,7 @@ local _C = {
 	default = {
 		speaker = "Steve",
 		portrait = "steve001portrait.png",
+		background = "room002.png",
 		text = "default text",
 	},
 	root = {
@@ -33,7 +34,7 @@ local _C = {
 		text = "Finally, you're back. What did you get?",
 	},
 	[8] = {
-		text = "A {itemName}? What are you going to do with that?",
+		text = "A {itemName}? What are you going to do with that? Wait, I have an idea.",
 		goToNode = 3,
 	}
 }

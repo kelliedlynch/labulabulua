@@ -2,6 +2,7 @@ local _C = {
 	default = {
 		speaker = "Joe",
 		portrait = "joe001portrait.png",
+		background = "room003.png",
 		text = "default text",
 	},
 	root = {
