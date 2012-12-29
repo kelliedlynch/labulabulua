@@ -1,19 +1,24 @@
 local _C = {}
---script = require "Resources/Conversations/steve001"
+
+--local Conversation = {}
 
 local function setupConversation(conversation)
 	-- Create the conversation layers
+	if bgLayer then bgLayer:clear() end
 	bgLayer = MOAILayer.new ()
 	bgLayer:setViewport ( viewport )
 	MOAISim.pushRenderPass ( bgLayer )
 
+	if spriteLayer then spriteLayer:clear() end
 	spriteLayer = MOAILayer.new ()
 	spriteLayer:setViewport ( viewport )
 	MOAISim.pushRenderPass ( spriteLayer )
 
+	if convoLayer then convoLayer:clear() end
 	convoLayer = MOAILayer.new ()
 	convoLayer:setViewport ( viewport )
 	MOAISim.pushRenderPass ( convoLayer )
+
 
 	-- Set up metatable for conversation script;
 	-- Any attempt to access a key that does not exist will return the default for that key,
@@ -28,6 +33,8 @@ local function setupConversation(conversation)
 end
 
 local function nextNode(conv, currentKey)
+	-- Returns the key and value of the next conversation node. If no current key
+	-- is provided, the root (entry point) will be returned.
     if currentKey then
         if type(currentKey) == "string" then
             currentKey = 3
@@ -40,64 +47,87 @@ local function nextNode(conv, currentKey)
     return currentKey, conv[currentKey]
 end
 
-local function drawSpeakerNameBox ()
-	if not nameBG then
-		gradient1 = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
-		nameBG = Meshes2D.newRect( -150 , -70 , 120 , 30 , gradient1 )
-		convoLayer:insertProp( nameBG )
+local function drawSpeakerNameBox(name)
+	if name == "" then
+		return nil
+	else
+		if not nameBG then
+			local gradient1 = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
+			local nameBG = Meshes2D.newRect( -150 , -70 , 120 , 30 , gradient1 )
+			convoLayer:insertProp( nameBG )
+		end
+
+		if not nameTextbox then
+			local nameTextbox = MOAITextBox.new ()
+			nameTextbox:setStyle ( newStyle ( defaultFont , 44 ))
+			nameTextbox:setRect ( -150 , -70 , -30 , -40 )
+			nameTextbox:setAlignment ( MOAITextBox.CENTER_JUSTIFY, MOAITextBox.CENTER_JUSTIFY )
+			nameTextbox:setYFlip(true)
+			convoLayer:insertProp ( nameTextbox )
+			nameTextbox:setString(name)
+			return nameTextBox
+		end
 	end
-
-	if not nameTextbox then
-		nameTextbox = MOAITextBox.new ()
-		nameTextbox:setStyle ( newStyle ( defaultFont , 44 ))
-		nameTextbox:setRect ( -150 , -70 , -30 , -40 )
-		nameTextbox:setAlignment ( MOAITextBox.CENTER_JUSTIFY, MOAITextBox.CENTER_JUSTIFY )
-		nameTextbox:setYFlip(true)
-		convoLayer:insertProp ( nameTextbox )
-	end
-	-- if s and #s > 0 then
-	-- 	nameTextbox:setString ( s )
-	-- end
-end
-
-local function drawMainTextBox()
-	if not mainTextBG then
-		gradient1 = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
-		mainTextBG = Meshes2D.newRect( -150 , -230 , 300 , 150 , gradient1 )
-		convoLayer:insertProp( mainTextBG )
-	end
-
-	if not mainTextbox then
-		mainTextbox = MOAITextBox.new ()
-		mainTextbox: setStyle (newStyle ( defaultFont, 38 ))
-		mainTextbox:setRect ( -140 , -230 , 140 , -90 )
-		mainTextbox:setAlignment (MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
-		mainTextbox:setYFlip ( true )
-		convoLayer:insertProp ( mainTextbox )
-	end
-end
-
-local function displaySpeakerSprite( img )
-	spriteTexture = MOAITexture.new ( )
-	spriteTexture:load ( "Resources/Images/"..img )
-	texX, texY = spriteTexture:getSize()
-	scaleFactor = texY / 380
-	texX = texX / scaleFactor
-	texY = texY / scaleFactor
-
-	gfxQuad = MOAIGfxQuad2D.new ()
-	gfxQuad:setTexture ( spriteTexture )
-	gfxQuad:setRect ( -(texX / 2) , - 240 + texY , -(texX/2) + texX , -240  )
-	gfxQuad:setUVRect ( 0, 0, 1, 1 )
-
-	prop = MOAIProp2D.new ()
-	prop:setDeck ( gfxQuad )
-	spriteLayer:insertProp ( prop )
+	return nil
 end
 
 local function page ( text , tbox )
 	tbox:setString ( text )
 	tbox:spool ()
+end
+
+local function drawMainTextBox(text)
+	if text == "" then
+		return nil
+	else
+		if not mainTextBG then
+			local gradient1 = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
+			local mainTextBG = Meshes2D.newRect( -150 , -230 , 300 , 150 , gradient1 )
+			convoLayer:insertProp( mainTextBG )
+			print("bg ", mainTextBG:getPriority())
+		end
+
+
+		if not mainTextbox then
+			local mainTextbox = MOAITextBox.new ()
+			mainTextbox:setStyle (newStyle ( defaultFont, 38 ))
+			mainTextbox:setRect ( -140 , -230 , 140 , -90 )
+			mainTextbox:setAlignment (MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
+			mainTextbox:setYFlip ( true )
+			-- mainTextbox:setDeck()
+			-- mainTextbox:setPriority(100)
+			convoLayer:insertProp ( mainTextbox )
+			page( text , mainTextbox )
+			print("text ", mainTextbox:getPriority())
+			return mainTextbox
+		end
+	end
+	return nil
+end
+
+local function displaySpeakerSprite( img )
+	if img == "" then
+		return nil
+	end
+	local spriteTexture = MOAITexture.new ( )
+	spriteTexture:load ( "Resources/Images/"..img )
+	local texX, texY = spriteTexture:getSize()
+	local scaleFactor = texY / 380
+	texX = texX / scaleFactor
+	texY = texY / scaleFactor
+
+	local gfxQuad = MOAIGfxQuad2D.new ()
+	gfxQuad:setTexture ( spriteTexture )
+	gfxQuad:setRect ( -(texX / 2) , - 240 + texY , -(texX/2) + texX , -240  )
+	gfxQuad:setUVRect ( 0, 0, 1, 1 )
+
+	local prop = MOAIProp2D.new ()
+	prop:setDeck ( gfxQuad )
+	prop:setPriority(10)
+
+	spriteLayer:insertProp ( prop )
+
+	return prop
 end
 
 local function clearNode()
@@ -106,67 +136,110 @@ local function clearNode()
 	nameBG, nameTextbox, mainTextBG, mainTextbox = nil
 end
 
+local function replaceVariables(str)
+	local formatted, count = string.gsub(str, "{([^}]+)}", 
+		function(varName)
+			return Player.variables[varName]
+		end
+		)
+	return formatted
+end
+
 local function goToNode(n)
 	clearNode()
 	_currentNodeKey , _currentNode = n , script[n]
-	drawSpeakerNameBox()
-	drawMainTextBox()
-	if _currentNode.portrait ~= "" then
-		displaySpeakerSprite( _currentNode.portrait )
-	end
+	-- for k,v in pairs(_currentNode) do
+	-- 	print(k,v)
+	-- end
+	-- for k,v in pairs(_currentNode.getItem) do
+	-- 	print(k,v)
+	-- end
+	--local foo = replaceVariables(_currentNode.text)
+	speakerNameBox = drawSpeakerNameBox(_currentNode.speaker)
+	speakerTextBox = drawMainTextBox(replaceVariables(_currentNode.text))
+	speakerSprite = displaySpeakerSprite( _currentNode.portrait )
 	
-	print("calling registerListener for mainTextBG")
-	TouchDispatcher.registerListener(mainTextBG, "advanceTextbox", mainTextbox)
-	nameTextbox:setString(_currentNode.speaker)
-	page ( _currentNode.text , mainTextbox )
+	TouchDispatcher.registerListener(_C, speakerTextBox , "advanceTextbox", speakerTextBox)
+	
+	
 end
 
 local function displayChoices ( self ) 
 	for k,v in pairs(_currentNode.choices) do
-		for kk, vv in pairs(v) do
-			print(kk , vv)
-		end
+		-- for kk, vv in pairs(v) do
+		-- 	print(kk , vv)
+		-- end
 	end
 	require "LLMenu"
 	makeMenu(_currentNode.choices)
 end
 
+local function getItem(item, qty)
+	--print("get item", item)
+	table.insert (Player.items , { [item] = 1, })
+	for k,v in pairs(Player.items) do
+		for k,v in pairs(v) do
+			print(k,v)
+		end
+	end
+end
+
+local function setVar(variable, value)
+	Player.variables[variable] = value
+end
+
 local function advanceTextbox(box)
+	-- for k,v in pairs(_currentNode) do
+	-- 	print(k,v)
+	-- end
+	-- if(_currentNode.getItem) then
+	-- 	for k,v in pairs(_currentNode.getItem) do
+	-- 		print(k,v)
+	-- 	end
+	-- end
 	if box:isBusy () then
 		box:stop()
 		box:revealAll()
-		TouchDispatcher.registerListener(mainTextBG, "advanceTextbox", box)
+		TouchDispatcher.registerListener(_C, speakerTextBox, "advanceTextbox", box)
 	else
 		if box:more() then
-			box:nextPage ()
+			box:nextPage()
 			box:spool()
-			TouchDispatcher.registerListener(mainTextBG, "advanceTextbox", box)
-		elseif _currentNode.choices then
-			displayChoices()
-		elseif _currentNode.exit then
-			print("end of conversation")
-		elseif _currentNode.goToNode then
-			goToNode(_currentNode["goToNode"])
-		elseif _currentNode.goToConv then
-			_C.goToConversation(_currentNode.goToConv.file , _currentNode.goToConv.node)
+			TouchDispatcher.registerListener(_C, speakerTextBox, "advanceTextbox", box)
 		else
-			_currentNodeKey, _currentNode = nextNode(script, _currentNodeKey)
-			goToNode(_currentNodeKey)
+			if _currentNode.getItem then
+				for k,v in pairs(_currentNode.getItem) do
+					getItem( k,v)
+				end
+			end
+			if _currentNode.setVar then
+				for k,v in pairs(_currentNode.setVar) do
+					setVar(k,v)
+				end
+			end
+			if _currentNode.choices then
+				displayChoices()
+			elseif _currentNode.exit then
+				print("end of conversation")
+			elseif _currentNode.goToNode then
+				goToNode(_currentNode["goToNode"])
+			elseif _currentNode.goToConv then
+				_C.goToConversation(_currentNode.goToConv.file , _currentNode.goToConv.node)
+			else
+				_currentNodeKey, _currentNode = nextNode(script, _currentNodeKey)
+				goToNode(_currentNodeKey)
+			end
 		end
 	end
 end
 
 function _C.goToConversation(file, node)
-	print("loading ", file)
 	script = require ("Resources/Conversations/"..file)
 	setupConversation(script)
 
-	print(node)
 	if node then
-		print("true")
 		goToNode(node)
 	else
-		print("false")
 		-- Load the first node
 		_currentNodeKey, _currentNode = nextNode(script)
 		goToNode(_currentNodeKey)
@@ -177,6 +250,16 @@ _C.options = {
 	advanceTextbox = function(box) advanceTextbox(box) end,
 	goToNode = 	function(n) goToNode(n) end,
 	goToConv = function(file, node) _C.goToConversation(file, node) end,
+	getItem = function(table) 
+					for k,v in pairs(table) do
+						getItem(k, v) 
+					end
+				end,
+	setVar = function(table)
+					for k,v in pairs(table) do
+						setVar(k,v)
+					end
+				end,
 }
 
 return _C

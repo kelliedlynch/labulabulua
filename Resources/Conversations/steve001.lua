@@ -31,7 +31,10 @@ local _C = {
 	},
 	[7] = {
 		text = "Finally, you're back. What did you get?",
-		goToNode = 3,
 	},
+	[8] = {
+		text = "A {itemName}? What are you going to do with that?",
+		goToNode = 3,
+	}
 }
 return _C

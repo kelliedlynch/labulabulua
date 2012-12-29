@@ -6,24 +6,27 @@ local _C = {
 	},
 	root = {
 		text = "Hi, I'm Joe. Take this sonic screwdriver.",
-		getItem = "sonic screwdriver",
+		getItem = { ["sonic screwdriver"] = 1, },
 	},
 	[3] = {
 		text = "I have to give you one other thing. What do you want?",
 		choices = {
 			["rubber duckie"] = {
-				getItem = "rubber duckie",
+				getItem = { ["rubber duckie"] = 1, },
+				setVar = { itemName = "rubber duckie", },
 				goToNode = 4,
 			},
 			["shiny nickel"] = {
-				getItem = "shiny nickel",
+				getItem = { ["shiny nickel"] = 1, },
+				setVar = { itemName = "shiny nickel", },
 				goToNode = 4,
 			},
 		},
 	},
 	[4] = {
 		boxStyle = "thought",
-		speaker = player,
+		speaker = Player.name,
+		portrait = "",
 		text = "What am I going to do with this?",
 		goToConv = { 
 			file = "steve001", 

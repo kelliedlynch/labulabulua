@@ -34,7 +34,7 @@ require "DrawClean/utils/lang"
 -- Load meshes file
 Meshes2D = require "DrawClean/draw/meshes2D"
 
-player = require "player"
+Player = require "player"
 
 -- Load the touch dispatcher
 TouchDispatcher = require "LLTouchDispatcher"

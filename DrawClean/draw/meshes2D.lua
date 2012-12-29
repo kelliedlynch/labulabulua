@@ -255,7 +255,7 @@ function _M.newRect( left, top, width, height, col )
 	-- Create a prop
 	------------------------------------------------------------
 
-	local prop = MOAIProp2D.new ()
+	local prop = MOAIProp.new ()
 	prop:setDeck ( mesh )
 	prop:setShader( shader )
 	prop:setLoc( left, top )
@@ -338,7 +338,7 @@ function _M.newCircle( x, y, r, col, seg )
 	local mesh = createMesh( vcoords, colorCoords, MOAIMesh.GL_TRIANGLE_FAN )
 
 	local shader = Shaders:newShader( Shaders.BASIC_COLOR_SHADER )
-	local prop = MOAIProp2D.new ()
+	local prop = MOAIProp.new ()
 	prop:setDeck ( mesh )
 	prop:setShader ( shader )
 	prop:setLoc( x, y )
@@ -389,7 +389,7 @@ function _M.createPolygon( vertices, col )
 	--debugger.printTable( triangulatedPoints, "TRI")
 
 	local mesh =  createMesh( triangulatedPoints, colorCoords, MOAIMesh.GL_TRIANGLES )
-	local prop = MOAIProp2D.new ()
+	local prop = MOAIProp.new ()
 	prop:setDeck ( mesh )
 	prop:setShader ( Shaders:newShader( Shaders.BASIC_COLOR_SHADER ) )
 
