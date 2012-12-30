@@ -43,4 +43,4 @@ TouchDispatcher.beginListening()
 conversation = require "conversation"
 --goToConversation("steve001")
 thread = MOAIThread.new ()
-thread:run ( conversation.goToConversation, "steve001" )
+thread:run ( conversation.goToConversation, "joe001" )

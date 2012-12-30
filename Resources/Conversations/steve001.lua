@@ -27,15 +27,35 @@ local _C = {
 	[6] = {
 		text = "Good. Now talk to my friend Joe.",
 		goToConv = {
-			file = "joe001"
+			file = "joe001",
 		},
 	},
 	[7] = {
 		text = "Finally, you're back. What did you get?",
 	},
 	[8] = {
+		portrait = "steve002portrait.png",
 		text = "A {itemName}? What are you going to do with that? Wait, I have an idea.",
+		conditional = { {
+			condition = "itemName",
+			results = { 
+				["rubber duckie"] = { goToNode = 9, }, 
+				["shiny nickel"] = { goToNode = 10, },
+			}, },
+		},
+	},
+	[9] = {
+		portrait = "steve003portrait.png",
+		text = "Let's take a bath!",
+		background = "bubblebath.png",
 		goToNode = 3,
-	}
+	},
+	[10] = {
+		portrait = "steve003portrait.png",
+		text = "Let's get bubblegum!",
+		background = "gumballmachine.png",
+		goToNode = 3,
+	},
 }
+
 return _C

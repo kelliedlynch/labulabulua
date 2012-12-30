@@ -205,6 +205,29 @@ local function setVar(variable, value)
 	Player.variables[variable] = value
 end
 
+local function checkConditionals(node)
+	node.checkedConditional = node.conditional
+	node.conditional = nil
+	for _,item in pairs(node.checkedConditional) do
+		for result, actionTable in pairs(item.results) do
+			for var, value in pairs(Player.variables) do
+				if result == value then
+					for action, data in pairs(actionTable) do
+						node[action] = data
+					end
+				elseif Player[item.condition] then
+					for action, data in pairs(actionTable) do
+						node[action] = data
+					end
+				end
+			end
+		end
+	end
+	if node.conditional then
+		checkConditionals(node)
+	end
+end
+
 local function advanceTextbox(box)
 	if box:isBusy () then
 		box:stop()
@@ -216,6 +239,12 @@ local function advanceTextbox(box)
 			box:spool()
 			TouchDispatcher.registerListener(_C, speakerTextBox, "advanceTextbox", box)
 		else
+			local _nextnode
+			-- Do conditionals first, because they may add other things to do.
+			-- If nodes start behaving unexpectedly, I may want to look at this.
+			if _currentNode.conditional then
+				checkConditionals(_currentNode)
+			end
 			if _currentNode.getItem then
 				for k,v in pairs(_currentNode.getItem) do
 					getItem( k,v)
@@ -226,6 +255,7 @@ local function advanceTextbox(box)
 					setVar(k,v)
 				end
 			end
+
 			if _currentNode.choices then
 				displayChoices()
 			elseif _currentNode.exit then
@@ -234,9 +264,12 @@ local function advanceTextbox(box)
 				goToNode(_currentNode["goToNode"])
 			elseif _currentNode.goToConv then
 				_C.goToConversation(_currentNode.goToConv.file , _currentNode.goToConv.node)
-			else
-				_currentNodeKey, _currentNode = nextNode(script, _currentNodeKey)
-				goToNode(_currentNodeKey)
+			elseif not _nextnode then
+				_nextnode = nextNode(script, _currentNodeKey)
+			end
+
+			if _nextnode then
+				goToNode(_nextnode)
 			end
 		end
 	end
