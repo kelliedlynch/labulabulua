@@ -114,7 +114,6 @@ local function drawMainTextBox(text)
 			end
 			local mainTextBG = Meshes2D.newRect( -150 , -230 , 300 , 150 , gradient )
 			convoLayer:insertProp( mainTextBG )
-			print("bg ", mainTextBG:getPriority())
 		end
 
 
@@ -128,7 +127,6 @@ local function drawMainTextBox(text)
 			-- mainTextbox:setPriority(100)
 			convoLayer:insertProp ( mainTextbox )
 			page( text , mainTextbox )
-			print("text ", mainTextbox:getPriority())
 			return mainTextbox
 		end
 	end
@@ -162,7 +160,7 @@ end
 local function clearNode()
 	convoLayer:clear()
 	spriteLayer:clear()
-	nameBG, nameTextbox, mainTextBG, mainTextbox = nil
+	nameBG, nameTextbox, mainTextBG, mainTextbox, _currentNode, _currentNodeKey = nil
 end
 
 local function replaceVariables(str)
@@ -174,9 +172,25 @@ local function replaceVariables(str)
 	return formatted
 end
 
+function deepcopy(orig)
+	-- deepcopy function from lua-users wiki
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
 local function goToNode(n)
 	clearNode()
-	_currentNodeKey , _currentNode = n , script[n]
+	_currentNodeKey , _currentNode = n , deepcopy(script[n])
 	background = displayBackground(_currentNode.background)
 	speakerNameBox = drawSpeakerNameBox(_currentNode.speaker)
 	speakerTextBox = drawMainTextBox(replaceVariables(_currentNode.text))
@@ -194,35 +208,51 @@ end
 
 local function getItem(item, qty)
 	table.insert (Player.items , { [item] = 1, })
-	for k,v in pairs(Player.items) do
-		for k,v in pairs(v) do
-			print(k,v)
-		end
-	end
 end
 
 local function setVar(variable, value)
 	Player.variables[variable] = value
 end
 
+local function changeVar(variable, value)
+	Player.variables[variable] = Player.variables[variable] + value
+end
+
+local function setStat(stat, value)
+	Player[stat] = value
+end
+
+local function changeStat(stat, value)
+	Player[stat] = Player[stat] + value
+end
+
 local function checkConditionals(node)
-	node.checkedConditional = node.conditional
-	node.conditional = nil
-	for _,item in pairs(node.checkedConditional) do
-		for result, actionTable in pairs(item.results) do
-			for var, value in pairs(Player.variables) do
-				if result == value then
+	-- Check if any of the current node's conditional statements are true
+	-- First they are checked against the Player.variables (game state) table.
+	-- Then against Player (player stats).
+	if node.conditional then
+		node.checkedConditional = nil
+		node.checkedConditional = node.conditional
+		node.conditional = nil
+
+		for _,item in pairs(node.checkedConditional) do
+			for result, actionTable in pairs(item.results) do
+				if Player.variables[item.condition] == result then
 					for action, data in pairs(actionTable) do
 						node[action] = data
 					end
-				elseif Player[item.condition] then
+				elseif Player[item.condition] == result then
 					for action, data in pairs(actionTable) do
 						node[action] = data
 					end
 				end
 			end
 		end
+		node.checkedConditional = nil
 	end
+
+	-- If there were any nested conditionals, they have just been added to the node.
+	-- Check the node again.
 	if node.conditional then
 		checkConditionals(node)
 	end
@@ -239,12 +269,9 @@ local function advanceTextbox(box)
 			box:spool()
 			TouchDispatcher.registerListener(_C, speakerTextBox, "advanceTextbox", box)
 		else
-			local _nextnode
 			-- Do conditionals first, because they may add other things to do.
-			-- If nodes start behaving unexpectedly, I may want to look at this.
-			if _currentNode.conditional then
-				checkConditionals(_currentNode)
-			end
+			checkConditionals(_currentNode)
+
 			if _currentNode.getItem then
 				for k,v in pairs(_currentNode.getItem) do
 					getItem( k,v)
@@ -253,6 +280,11 @@ local function advanceTextbox(box)
 			if _currentNode.setVar then
 				for k,v in pairs(_currentNode.setVar) do
 					setVar(k,v)
+				end
+			end
+			if _currentNode.changeStat then
+				for k,v in pairs(_currentNode.changeStat) do
+					changeStat(k,v)
 				end
 			end
 
@@ -264,12 +296,8 @@ local function advanceTextbox(box)
 				goToNode(_currentNode["goToNode"])
 			elseif _currentNode.goToConv then
 				_C.goToConversation(_currentNode.goToConv.file , _currentNode.goToConv.node)
-			elseif not _nextnode then
-				_nextnode = nextNode(script, _currentNodeKey)
-			end
-
-			if _nextnode then
-				goToNode(_nextnode)
+			else
+				goToNode(nextNode(script, _currentNodeKey))
 			end
 		end
 	end
@@ -288,6 +316,10 @@ function _C.goToConversation(file, node)
 	end
 end
 
+-- The following are possible responses to touch events from TouchDispatcher.
+-- This table is necessary for LLMenu to be able to pass the name of an action
+-- to TouchDispatcher; otherwise all conversation options would need to be global.
+-- Maybe that wouldn't be such a bad thing...
 _C.options = {
 	advanceTextbox = function(box) advanceTextbox(box) end,
 	goToNode = 	function(n) goToNode(n) end,

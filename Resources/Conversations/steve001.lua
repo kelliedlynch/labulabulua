@@ -43,19 +43,25 @@ local _C = {
 				["shiny nickel"] = { goToNode = 10, },
 			}, },
 		},
+		--goToNode = 11,
 	},
 	[9] = {
 		portrait = "steve003portrait.png",
 		text = "Let's take a bath!",
 		background = "bubblebath.png",
-		goToNode = 3,
+		goToNode = 11,
 	},
 	[10] = {
 		portrait = "steve003portrait.png",
 		text = "Let's get bubblegum!",
 		background = "gumballmachine.png",
-		goToNode = 3,
+		goToNode = 11,
 	},
+	[11] = {
+		text = "Well, that was silly.",
+		changeStat = { silliness = 1, },
+		goToNode = 3,
+	}
 }
 
 return _C
