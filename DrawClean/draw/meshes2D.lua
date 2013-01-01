@@ -219,6 +219,17 @@ function _M.newRect( left, top, width, height, col )
 	-- Prepare vertex coordinates and vertex colors for vbo
 	------------------------------------------------------------
 	local vcoords, colorCoords = {}, {}
+	--------------------------------------------------------------------
+	-- EDIT BY KELLIE
+	-- Convert x/y coords to width/height. This is purely so I can pass
+	-- x/y instead of w/h to match the coordinate system I'm using
+	-- elsewhere.
+	--------------------------------------------------------------------
+	width = width - left
+	height = height - top
+	--------------------------------------------------------------------
+	-- END EDIT BY KELLIE
+	--------------------------------------------------------------------
 
 	-- vertex coordinates
 	vcoords[1] = { 0, 0 }

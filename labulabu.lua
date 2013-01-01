@@ -8,7 +8,33 @@ MOAISim.openWindow ( "LabuLabu", screenWidth, screenHeight )
 -- Create the viewport
 viewport = MOAIViewport.new ()
 viewport:setSize ( screenWidth , screenHeight )
-viewport:setScale ( 320 , 480 )
+viewport:setScale ( 320, 480 ) -- use negative Y axis
+viewport:setOffset ( -1, -1 ) -- offset projection origin by -1, 1 in OpenGL projection space
+
+--------------------------------------------------------------------
+-- Initialize Game Layers
+--------------------------------------------------------------------
+
+-- Layer for background images
+BackgroundLayer = MOAILayer.new ()
+BackgroundLayer:setViewport ( viewport )
+MOAISim.pushRenderPass ( BackgroundLayer )
+
+-- Layer for character sprites and animations
+SpriteLayer = MOAILayer.new ()
+SpriteLayer:setViewport ( viewport )
+MOAISim.pushRenderPass ( SpriteLayer )
+
+-- Layer for conversation and hub windows
+WindowLayer = MOAILayer.new ()
+WindowLayer:setViewport ( viewport )
+MOAISim.pushRenderPass ( WindowLayer )
+
+-- Layer for popup notifications in conversations and hub
+PopupLayer = MOAILayer.new ()
+PopupLayer:setViewport ( viewport )
+MOAISim.pushRenderPass ( PopupLayer )
+
 
 -- Load game fonts
 charcodes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;!?()&/-'
@@ -29,6 +55,23 @@ function newStyle ( font, size, scale )
 	return style;
 end
 
+
+function deepcopy(orig)
+	-- deepcopy function from lua-users wiki
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
 -- Load DrawClean polygon library
 require "DrawClean/utils/lang"
 -- Load meshes file
@@ -40,7 +83,18 @@ Player = require "player"
 TouchDispatcher = require "LLTouchDispatcher"
 TouchDispatcher.beginListening()
 
-conversation = require "conversation"
+-- Load the event dispatcher
+EventDispatcher = require "LLEventDispatcher"
+
+LLMenu = require "LLMenu"
+
+LLConversation = require "LLConversation"
+
+--require "test"
+
+conversation = LLConversation.new("joe001")
+
 --goToConversation("steve001")
-thread = MOAIThread.new ()
-thread:run ( conversation.goToConversation, "joe001", 3 )
+thread = MOAIThread.new()
+thread:run ( conversation.goToConversation, conversation, nil, 3 )
+--thread:run ( runTest )
