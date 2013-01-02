@@ -13,7 +13,7 @@ local _C = {
 		text = "I have to give you one other thing. What do you want?",
 		choices = {
 			["rubber duckie"] = {
-				getItem = { ["rubber duckie"] = 1, },
+				getItem = { ["rubber duckie"] = 1, ["sexy rubber duckie"] = 1, ["BIG BLACK DICK"] = 1 },
 				setVar = { itemName = "rubber duckie", },
 				goToNode = 4,
 			},

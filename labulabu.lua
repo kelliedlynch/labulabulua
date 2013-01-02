@@ -79,12 +79,16 @@ Meshes2D = require "DrawClean/draw/meshes2D"
 
 Player = require "player"
 
--- Load the touch dispatcher
-TouchDispatcher = require "LLTouchDispatcher"
-TouchDispatcher.beginListening()
+-- -- Load the touch dispatcher
+-- TouchDispatcher = require "LLTouchDispatcher"
+-- TouchDispatcher.beginListening()
 
--- Load the event dispatcher
-EventDispatcher = require "LLEventDispatcher"
+-- -- Load the event dispatcher
+-- EventDispatcher = require "LLEventDispatcher"
+
+-- Load combined dispatcher
+LLDispatcher = require "LLDispatch"
+LLDispatcher.beginListeningForTouches()
 
 LLMenu = require "LLMenu"
 
@@ -96,5 +100,5 @@ conversation = LLConversation.new("joe001")
 
 --goToConversation("steve001")
 thread = MOAIThread.new()
-thread:run ( conversation.goToConversation, conversation, nil, 3 )
+thread:run ( LLDispatcher.triggerEvent, "startConversation" )
 --thread:run ( runTest )

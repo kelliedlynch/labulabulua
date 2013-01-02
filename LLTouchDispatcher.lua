@@ -18,18 +18,18 @@ function _T.__clickOrTouch(x,y)
 		--print(propTouched, listener.prop, listener.callback)
 		if propTouched == listener.prop then
 			--print("prop touched", propTouched)
-			if not listener.permanent then 
+			if not listener.persistent then 
 				--print("removing listener for: ", listener.callback)
 				_T.listeners[k] = nil 
 			end
-			if listener.context.options then
-				if listener.context.options[listener.callback] then
-					context = listener.context
-					context.options[listener.callback](listener.context, listener.callbackValue)
-				end
-			else
-				_G[listener.callback](listener.callbackValue)
-			end			
+			-- if listener.context.options then
+			-- 	if listener.context.options[listener.callback] then
+			-- 		context = listener.context
+			-- 		context.options[listener.callback](listener.context, listener.callbackValue)
+			-- 	end
+			-- else
+			-- 	_G[listener.callback](listener.callbackValue)
+			-- end			
 		end
 		--print( k , listener)
 	end
@@ -61,7 +61,7 @@ function _T.__checkLayer(layer, x, y, z)
 	return false
 end
 
-function _T.registerListener( context, propListening , callbackFunction , callbackFunctionValue , permanentListener )
+function _T.registerListener( context, propListening, callbackFunction , callbackFunctionValue , permanentListener )
 	print("registering listener", propListening, callbackFunction)
 	if not permanentListener then permanentListener = false end
 	table.insert(_T.listeners , { 

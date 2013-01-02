@@ -17,6 +17,7 @@ function _E.registerPermanentEvent(...)
 end
 
 function _E.triggerEvent(name)
+	print("event triggered: ", name)
 	for k, listener in pairs(_E.events) do
 		print("k,listener",k,listener)
 		if name == listener.eventName then

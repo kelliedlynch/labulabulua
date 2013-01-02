@@ -2,46 +2,39 @@ local _C = {}
 
 _C.__index = _C
 
-------------------------------------------------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+--
 -- Public Functions
-------------------------------------------------------------
-function _C.new(file, node)
+--
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+function _C.new(file)
+	--------------------------------------------------------------------
+	-- Create a new conversation object from the specified script file
+	--------------------------------------------------------------------
 	local conv = {}
 	setmetatable(conv, _C)
-	conv.script = require ("Resources/Conversations/"..file)
-	_C.__setupScript(conv.script)
-	-- if node then 
-	-- 	conv.currentNodeKey = node
-	-- 	conv.currentNode = conv[node]
-	-- end
+	
+	-- Load script, and set up metatable for script defaults
+	local script = require ("Resources/Conversations/"..file)
+	conv.script = _C.__setupScriptDefaults(script)
+
+	-- Begin listening for the startConversation event
+	LLDispatcher.registerEventListener(conv, "startConversation")
+
 	return conv
 end
 
-function _C.goToConversation(self, file, node)
-	print("self,file,node",self,file,node)
-	print("conversation is", self)
-	if file then
-		self.script = require ("Resources/Conversations/"..file)
-		self.__setupScript(self.script)
-	end
-
-	if node then
-		self:__goToNode(node)
-	else
-		-- Load the first node
-		self.currentNodeKey, self.currentNode = self.__nextNode(self.script)
-		self:__goToNode(self.currentNodeKey)
-	end
-end
-
-------------------------------------------------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+-- 
 -- Private Functions
-------------------------------------------------------------
+--
+--------------------------------------------------------------------
+--------------------------------------------------------------------
 
-function _C.__setupScript(script)
-	-- Set up metatable for conversation script;
-	-- Any attempt to access a key that does not exist will return the default for that key,
-	-- if it exists.
+function _C.__setupScriptDefaults(script)
 	local mt = {}
 	mt.__index = script.default
 	for k,v in pairs(script) do
@@ -49,112 +42,70 @@ function _C.__setupScript(script)
 			setmetatable(v, mt)
 		end
 	end
+	return script
 end
+
+-- Function for switching scripts mid-conversation. Might also be used
+-- when first loading conversation. Examine later.
+-- function _C.__changeScript(file, node)
+-- 	local script = require ("Resources/Conversations/"..file)
+-- 	conv.script = _C.__setupScriptDefaults(script)
+-- end
 
 function _C.__nextNode(conv, currentKey)
 	-- Returns the key and value of the next conversation node. If no current key
 	-- is provided, the root (entry point) will be returned.
     if currentKey then
         if type(currentKey) == "string" then
-            currentKey = 3
-        else
-            currentKey = currentKey + 1
-        end
-    else
-        currentKey = "root"
-    end
+        	-- scripts are currently structured such that "root" is at index 2,
+        	-- so if currentKey is a string, next key is 3
+            currentKey = 3 
+        else currentKey = currentKey + 1 end
+    else currentKey = "root" end
     return currentKey, conv[currentKey]
 end
 
-function _C.__displayBackground( img )
-	if img == "" then
-		return nil
-	end
-	local spriteTexture = MOAITexture.new ( )
-	spriteTexture:load ( "Resources/Images/"..img )
-	local texX, texY = spriteTexture:getSize()
-	-- use screen height to determine scale
-	local scaleFactor = texY / 480
-	texX = texX / scaleFactor
-	texY = texY / scaleFactor
+function _C:__goToNode(n)
+	-- draw all the node elements
+	self.currentNodeKey , self.currentNode = n , deepcopy(self.script[n])
+	self.background = self.__displayBackground(self.currentNode.background)
+	self.speakerNameBox = self:__drawSpeakerNameBox(self.currentNode.speaker)
+	self.speakerTextTextbox = self:__drawMainTextBox(self.currentNode.text)
+	self.speakerSprite = self.__displaySpeakerSprite( self.currentNode.portrait )
 
-	local gfxQuad = MOAIGfxQuad2D.new ()
-	gfxQuad:setTexture ( spriteTexture )
-	gfxQuad:setRect ( 0 , 0 , 320 , 480  )
-	--gfxQuad:setUVRect ( 0, 0, 1, 1 )
+	-- wait for touches
+	LLDispatcher.registerTouchListener(self, self.speakerTextTextbox, "textboxTapped", self.speakerTextTextbox)
+	-- LLDispatcher.registerEventListener(self.speakerTextTextbox, "boxTapped" )
+	LLDispatcher.registerEventListener(self, "nodeTextFinished")
+end
+
+function _C.__displayBackground(img)
+	if img == "" then return nil end
+
+	local spriteTexture = MOAITexture.new()
+	spriteTexture:load("Resources/Images/"..img)
+
+	local gfxQuad = MOAIGfxQuad2D.new()
+	gfxQuad:setTexture (spriteTexture)
+	gfxQuad:setRect (0, 0, screenWidth, screenHeight)
+
+	--------------------------------------------------------------------
+	-- The following will make room003.png display properly if it is
+	-- padded out to power-of-2 dimensions (1024 x 2048). Look into this
+	-- later; optimizing textures may improve performance.
+	--------------------------------------------------------------------
+	-- gfxQuad:setQuad (0, 683, 381, 683, 381, 0, 0, 0)
 
 	local prop = MOAIProp2D.new ()
-	prop:setDeck ( gfxQuad )
-
-	BackgroundLayer:insertProp ( prop )
+	prop:setDeck(gfxQuad)
+	BackgroundLayer:insertProp(prop)
 
 	return prop
 end
 
-function _C.__drawSpeakerNameBox(name)
-	if name == "" then
-		return nil
-	else
-		if not nameBG then
-			local gradient1 = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
-			local nameBG = Meshes2D.newRect( 10 , 170 , 130 , 200 , gradient1 )
-			WindowLayer:insertProp( nameBG )
-		end
-
-		if not nameTextbox then
-			local nameTextbox = MOAITextBox.new ()
-			nameTextbox:setStyle ( newStyle ( defaultFont , 44 ))
-			nameTextbox:setRect ( 10 , 170 , 130 , 200 )
-			nameTextbox:setAlignment ( MOAITextBox.CENTER_JUSTIFY, MOAITextBox.CENTER_JUSTIFY )
-			nameTextbox:setYFlip(true)
-			WindowLayer:insertProp ( nameTextbox )
-			nameTextbox:setString(name)
-			return nameTextBox
-		end
-	end
-	return nil
-end
-
-function _C.__page(text, tbox)
-	tbox:setString ( text )
-	tbox:spool ()
-end
-
-function _C:__drawMainTextBox(text)
-	if text == "" then
-		return nil
-	else
-		if not mainTextBG then
-			local gradient 
-			if self.currentNode.boxStyle == "thought" then
-				gradient = Meshes2D.newGradient( "#AACC00", "#AA99FF", 45 )
-			else
-				gradient = Meshes2D.newGradient( "#00CC00", "#0099FF", 45 )
-			end
-			local mainTextBG = Meshes2D.newRect( 10 , 10 , 300 , 150 , gradient )
-			WindowLayer:insertProp( mainTextBG )
-		end
-
-
-		if not mainTextbox then
-			local mainTextbox = MOAITextBox.new ()
-			mainTextbox:setStyle (newStyle ( defaultFont, 38 ))
-			mainTextbox:setRect ( 20 , 20 , 290 , 140 )
-			mainTextbox:setAlignment (MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
-			mainTextbox:setYFlip ( true )
-			WindowLayer:insertProp ( mainTextbox )
-			self.__page( text , mainTextbox )
-			return mainTextbox
-		end
-	end
-	return nil
-end
-
-function _C.__displaySpeakerSprite( img )
-	if img == "" then
-		return nil
-	end
-	local spriteTexture = MOAITexture.new ( )
+function _C.__displaySpeakerSprite(img)
+	if img == "" then return nil end
+	local spriteTexture = MOAITexture.new()
 	spriteTexture:load ( "Resources/Images/"..img )
 	local texX, texY = spriteTexture:getSize()
 	local scaleFactor = texY / 380
@@ -167,18 +118,60 @@ function _C.__displaySpeakerSprite( img )
 
 	local prop = MOAIProp2D.new ()
 	prop:setDeck ( gfxQuad )
-
 	SpriteLayer:insertProp ( prop )
 
 	return prop
 end
 
-function _C:__clearNode()
-	WindowLayer:clear()
-	SpriteLayer:clear()
-	nameBG, nameTextbox, mainTextBG, mainTextbox, self.currentNode, self.currentNodeKey = nil
+function _C:__drawSpeakerNameBox(name)
+	if name == "" then return nil else
+		local gradient
+		if self.currentNode.boxStyle == "thought" then
+			gradient = Meshes2D.newGradient( "#fcecfc", "#ff7cd8", 45 )
+		else
+			gradient = Meshes2D.newGradient( "#2c539e", "#3f4c6b", 45 )
+		end
+		local nameBG = Meshes2D.newRect( 10 , 170 , 130 , 200 , gradient )
+		WindowLayer:insertProp( nameBG )
+
+		local nameTextbox = MOAITextBox.new ()
+		nameTextbox:setStyle ( newStyle ( defaultFont , 44 ))
+		nameTextbox:setRect ( 10 , 170 , 130 , 200 )			
+		nameTextbox:setAlignment ( MOAITextBox.CENTER_JUSTIFY, MOAITextBox.CENTER_JUSTIFY )
+		nameTextbox:setYFlip(true)
+		WindowLayer:insertProp ( nameTextbox )
+		nameTextbox:setString(name)
+		return nameTextBox
+	end
+	return nil
 end
 
+function _C:__drawMainTextBox(text)
+	if text == "" then return nil else
+		local gradient 
+		if self.currentNode.boxStyle == "thought" then
+			gradient = Meshes2D.newGradient( "#fcecfc", "#ff7cd8", 45 )
+		else
+			gradient = Meshes2D.newGradient( "#2c539e", "#3f4c6b", 45 )
+		end
+		local mainTextBG = Meshes2D.newRect( 10 , 10 , 300 , 150 , gradient )
+		WindowLayer:insertProp( mainTextBG )
+
+		local mainTextbox = MOAITextBox.new()
+		mainTextbox:setStyle(newStyle(defaultFont, 38 ))
+		mainTextbox:setRect(20 , 20 , 290 , 140 )
+		mainTextbox:setAlignment(MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
+		mainTextbox:setYFlip(true)
+		WindowLayer:insertProp(mainTextbox)
+		self:__scrollText(text, mainTextbox)
+		return mainTextbox
+	end
+	return nil
+end
+
+--------------------------------------------------------------------
+-- Functions for processing text in conversation dialogue
+--------------------------------------------------------------------
 function _C.__replaceVariables(str)
 	local formatted, count = string.gsub(str, "{([^}]+)}", 
 		function(varName)
@@ -188,86 +181,14 @@ function _C.__replaceVariables(str)
 	return formatted
 end
 
-function _C:__deepcopy(orig)
-	-- deepcopy function from lua-users wiki
-    local orig_type = type(orig)
-    local copy
-    if orig_type == 'table' then
-        copy = {}
-        for orig_key, orig_value in next, orig, nil do
-            copy[self:__deepcopy(orig_key)] = self:__deepcopy(orig_value)
-        end
-        setmetatable(copy, self:__deepcopy(getmetatable(orig)))
-    else -- number, string, boolean, etc
-        copy = orig
-    end
-    return copy
+function _C:__scrollText(text, tbox)
+	tbox:setString (self.__replaceVariables(text))
+	tbox:spool ()
 end
 
-function _C:__goToNode(n)
-	--------------------------------------------------------------------
-	-- A SYMPTOM OF MY PROBLEM IS THAT WHEN GOTONODE IS CALLED BY THE
-	-- EVEN DISPATCHER, SELF HAS BEEN SET TO THE PREVIOUS N VALUE
-	--------------------------------------------------------------------
-	print("self, n", self, n)
-	--if there's a notification visible, wait for that
-	if self.notificationVisible then
-		print("notification is visible, wait for it to be cleared and call gotonode again")
-		-- for k,v in pairs(n) do
-		-- 	print("k,v in n",k,v)
-		-- end
-		-- EventDispatcher.registerEvent(self, "notificationCleared", self.__goToNode, n)
-		EventDispatcher.registerEvent(self, "notificationCleared", self.__goToNode, self, n )
-		--TouchDispatcher.registerListener(self, speakerTextBox , "clear", speakerTextBox, true)	
-	else
-		self:__clearNode()
-		self.currentNodeKey , self.currentNode = n , self:__deepcopy(self.script[n])
-		background = self.__displayBackground(self.currentNode.background)
-		speakerNameBox = self.__drawSpeakerNameBox(self.currentNode.speaker)
-		speakerTextBox = self:__drawMainTextBox(self.__replaceVariables(self.currentNode.text))
-		speakerSprite = self.__displaySpeakerSprite( self.currentNode.portrait )
-		TouchDispatcher.registerListener(self, speakerTextBox , "advanceTextbox", speakerTextBox, true)	
-	end
-end
-
-function _C:__displayChoices ()
-	print("displayChoices") 
-	for choice, actions in pairs(self.currentNode.choices) do
-		for action, data in pairs(actions) do
-			if action == "goToNode" then
-				print("value of", action)
-				print("for choice", choice)
-				print("has been set to", data)
-				self.currentNode.choices[choice][action] = data
-			end
-		end
-	end
-	self.menu = LLMenu.makeMenu(WindowLayer, self.currentNode.choices)
-end
-
-function _C:__getItem(item, qty)
-	table.insert (Player.items , { [item] = 1, })
-	local text = "Got item: "..item
-	self:__displayNotification("Got item: "..item)
-	--TouchDispatcher.registerListener(self, notificationTextBox, "clearNotification", box, false, TouchDispatcher.CONVERSATION_NOTIFICATION_PRIORITY)
-	--TouchDispatcher.registerListener(self, speakerTextBox, "displayNotification", text)
-end
-
-function _C.__setVar(variable, value)
-	Player.variables[variable] = value
-end
-
-function _C.__changeVar(variable, value)
-	Player.variables[variable] = Player.variables[variable] + value
-end
-
-function _C.__setStat(stat, value)
-	Player[stat] = value
-end
-
-function _C.__changeStat(stat, value)
-	Player[stat] = Player[stat] + value
-end
+--------------------------------------------------------------------
+-- Functions for processing end-of-node stuff
+--------------------------------------------------------------------
 
 function _C:__checkConditionals(node)
 	-- Check if any of the current node's conditional statements are true
@@ -301,6 +222,31 @@ function _C:__checkConditionals(node)
 	end
 end
 
+function _C:__getNodeItems(node)
+	-- add item to inventory
+	-- display notification about item
+	-- wait for touch
+	-- add next item to inv.
+	if node.getItem then
+		item, qty = next(node.getItem)
+		if item then
+			self:__getItem(item, qty)
+			-- after the item is gained and notification cleared, check for items again
+			--LLDispatcher.registerEventListener(self, "notificationCleared", "__getNodeItems", node )
+		end
+	end
+end
+
+function _C:__getItem(item, qty)
+	table.insert (Player.items , { [item] = 1, })
+	local text = "Got item: "..item
+
+	self.currentNode.getItem[item] = nil
+	self:__displayNotification("Got item: "..item)
+	--TouchDispatcher.registerListener(self, notificationTextBox, "clearNotification", box, false, TouchDispatcher.CONVERSATION_NOTIFICATION_PRIORITY)
+	--TouchDispatcher.registerListener(self, speakerTextTextbox, "displayNotification", text)
+end
+
 function _C:__displayNotification(text)
 	local gradient1 = Meshes2D.newGradient( "#CC33CC", "#0099FF", 45 )
 	local notificationBG = Meshes2D.newRect( 40 , 215 , 280 , 260 , gradient1 )
@@ -314,129 +260,87 @@ function _C:__displayNotification(text)
 	PopupLayer:insertProp ( notificationTextbox )
 	notificationTextbox:setString(text)
 	self.notificationVisible = true
-	TouchDispatcher.registerListener(self, notificationTextbox, "clearNotification")
+	
+	LLDispatcher.registerTouchListener(self, notificationTextbox, "clearNotification")
+	LLDispatcher.registerTouchListener(self, self.speakerTextTextbox, "clearNotification")
 end
 
-function _C:__clearNotification()
-	print("clearing")
-	PopupLayer:clear()
-	self.notificationVisible = false
-	TouchDispatcher.removeListenersForEvent("clearNotification")
-	EventDispatcher.triggerEvent("notificationCleared")
-end
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+--
+-- onTouch Responders
+-- 
+--------------------------------------------------------------------
+--------------------------------------------------------------------
 
-function _C:__advanceTextbox(box)
-	print("notification visible", self.notificationVisible)
-	if self.notificationVisible then
-		self:__clearNotification()
-	elseif self.menu then
-		--wait for menu input
-	elseif box:isBusy () then
+function _C:__onTextboxTapped(box)
+	if box:isBusy() then
 		box:stop()
 		box:revealAll()
-		--TouchDispatcher.registerListener(self, speakerTextBox, "advanceTextbox", box)
+		LLDispatcher.registerTouchListener(self, box, "textboxTapped", box)
+	elseif box:more() then
+		box:nextPage()
+		box:spool()
+		LLDispatcher.registerTouchListener(self, box, "textboxTapped", box)
 	else
-		if box:more() then
-			box:nextPage()
-			box:spool()
-			--TouchDispatcher.registerListener(self, speakerTextBox, "advanceTextbox", box)
-		else
-			-- if self.currentNode.processed then
-			-- 	self:__leaveNode()
-			-- else
-			-- 	self:__processNode()
-			-- end
-			self:__processNode()
+		LLDispatcher.triggerEvent("nodeTextFinished")
+	end
+end
+
+function _C:__onClearNotification()
+	PopupLayer:clear()
+	-- self.notificationVisible = false
+	-- TouchDispatcher.removeListenersForEvent("clearNotification")
+	-- EventDispatcher.triggerEvent("notificationCleared")
+	LLDispatcher.triggerEvent("notificationCleared")
+end
+
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+--
+-- onEvent Responders
+--
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+
+function _C:__onStartConversation(node)
+	--------------------------------------------------------------------
+	-- Begin the conversation. Node is optional and will probably not be
+	-- used much. If used, conversation will start on that node.
+	--------------------------------------------------------------------
+	if node then
+		self:__goToNode(node)
+	else
+		-- Load the first node
+		self.currentNodeKey, _ = self.__nextNode(self.script)
+		self:__goToNode(self.currentNodeKey)
+	end
+end
+
+function _C:__onNodeTextFinished()
+	-- Process conditionals first, because they may add other things to do.
+	self:__checkConditionals(self.currentNode)
+
+	if self.currentNode.getItem then self:__getNodeItems(self.currentNode) end
+
+	if self.currentNode.setVar then
+		for k,v in pairs(self.currentNode.setVar) do
+			self.__setVar(k,v)
+		end
+	end
+	if self.currentNode.changeStat then
+		for k,v in pairs(self.currentNode.changeStat) do
+			self.__changeStat(k,v)
 		end
 	end
 end
 
-function _C:__processNode()
-	print("actionsDone, notificationVisible", self.currentNode.actionsDone, self.notificationVisible)
-	-- if self.currentNode.actionsDone and not self.notificationVisible then
-	-- 	self:__leaveNode()
-	-- else
-	if not self.currentNode.actionsDone then
-		-- Process conditionals first, because they may add other things to do.
-		self:__checkConditionals(self.currentNode)
-
-		self:__getNodeItems(self.currentNode)
-		-- Do things that don't require leaving the node
-
-		if self.currentNode.setVar then
-			for k,v in pairs(self.currentNode.setVar) do
-				self.__setVar(k,v)
-			end
-		end
-		if self.currentNode.changeStat then
-			for k,v in pairs(self.currentNode.changeStat) do
-				self.__changeStat(k,v)
-			end
-		end
-		--TouchDispatcher.registerListener(self, sz)
-		--self:__leaveNode()
-		self.currentNode.actionsDone = true
-	end
-	if self.currentNode.actionsDone and not self.notificationVisible then
-		self:__leaveNode()
-	elseif self.currentNode.actionsDone and self.notificationVisible then
-		-- Actions are done, but a notification is visible. When the notification
-		-- is cleared, you may leave the node.
-		EventDispatcher.registerEvent(self, "notificationCleared", self.__leaveNode, self )
-	end
-end 
-
-function _C:__getNodeItems(node)
-	if node.getItem then
-		for k,v in pairs(node.getItem) do
-			--node.gainedItem[k] = node.getItem[k]
-			--node.gainedItem = node.getItem
-			node.getItem[k] = nil
-			self:__getItem( k,v)
-			-- When this item has been gained and its notification cleared, get the next item
-			--EventDispatcher.registerListener(self, "itemGained", )
-		end
-	end
+function _C:__onNotificationCleared(action, ...)
+	--------------------------------------------------------------------
+	-- Responder for notificationCleared events. Takes a function name
+	-- and a table of parameters, even if function only takes one param
+	--------------------------------------------------------------------
+	self[action](self, ...)
 end
-
-function _C:__leaveNode()
-	--if not self.notificationVisible then
-		-- Now we have the ways one might leave a node
-		if self.currentNode.choices then
-			self:__displayChoices()
-		elseif self.currentNode.exit then
-			print("end of conversation")
-		elseif self.currentNode.goToNode then
-			self:__goToNode(self.currentNode["goToNode"])
-		elseif self.currentNode.goToConv then
-			self.goToConversation(self, self.currentNode.goToConv.file , self.currentNode.goToConv.node)
-		else
-			self:__goToNode(self.__nextNode(self.script, self.currentNodeKey))
-		end
-	--end
-end
-
--- The following are possible responses to touch events from TouchDispatcher.
--- This table is necessary for LLMenu to be able to pass the name of an action
--- to TouchDispatcher; otherwise all conversation options would need to be global.
--- Maybe that wouldn't be such a bad thing...
-_C.options = {
-	advanceTextbox = function(self, box) self:__advanceTextbox(box) end,
-
-	goToNode = 	function(self, n) self:__goToNode(n) end,
-	goToConv = function(self, file, node) self.goToConversation(file, node) end,
-	getItem = function(self, table) 
-					for k,v in pairs(table) do
-						self:__getItem(k, v) 
-					end
-				end,
-	setVar = function(self, table)
-					for k,v in pairs(table) do
-						self.__setVar(k,v)
-					end
-				end,
-	displayNotification = function(self, text) self:__displayNotification(text) end,
-	clearNotification = function(self) self:__clearNotification() end,
-}
 
 return _C
