@@ -14,6 +14,7 @@ function _D.registerTouchListener( objectListening, propTouched, eventToFire, ..
 	-- touched. By default, a touch listener will only catch the first
 	-- touch event, then it will stop listening.
 	--------------------------------------------------------------------
+	print("registering", objectListening, propTouched, eventToFire, ...)
 	table.insert(_D.touchListeners, { 
 		listener = objectListening,
 		prop = propTouched,
@@ -27,7 +28,10 @@ function _D.registerPersistentTouchListener( ... )
 	-- A persistent touch listener will continue to respond to touches
 	-- until it is told not to.
 	--------------------------------------------------------------------
+	print("persistent touch listener arguments", ...)
+	print("#listeners", #_D.touchListeners)
 	_D.registerTouchListener(...)
+	print("#listeners", #_D.touchListeners)
 	_D.touchListeners[#_D.touchListeners].persistent = true
 end
 
@@ -37,6 +41,7 @@ function _D.registerEventListener( objectListening, eventName, ... )
 	-- event. By default, an event listener will only respond the first
 	-- time an event is triggered, then it will stop listening.
 	--------------------------------------------------------------------
+	print("registering", eventName)
 	table.insert(_D.eventListeners, {
 		listener = objectListening,
 		event = eventName,
@@ -53,36 +58,54 @@ function _D.registerPersistentEventListener( ... )
 	_D.eventListeners[#_D.eventListeners].persistent = true
 end
 
+function _D.removeListenersForProp( propListening )
+	for k , v in pairs(_D.touchListeners) do
+		if v.prop == propListening then
+			table.remove(_D.touchListeners, k)
+		end
+	end
+end
+
 function _D.triggerEvent( eventName )
 	--------------------------------------------------------------------
 	-- Tell all objects listening for eventName to respond by calling
 	-- __onEventName for each object
 	--------------------------------------------------------------------
 
-	-- copy the listeners table
+	-- copy the listeners table so we don't trigger new events added during this process.
+	-- Why isn't a deepcopy necessary? I should try to understand this.
+	-- local eListeners = deepcopy(_D.eventListeners)
 	local eListeners = {}
 	for k, listener in pairs(_D.eventListeners) do
 		eListeners[k] = listener
 	end
-
+	print("triggering", eventName)
 	for k, l in pairs(eListeners) do
+		--print(eventName, l.event)
 		if eventName == l.event then
 			-- if listener is not persistent, have the object stop listening
 			if not l.persistent then
 				_D.eventListeners[k] = nil
 			end
+			-- print("listeners")
+			-- for k,v in pairs(_D.eventListeners) do
+			-- 	print(k,v)
+			-- end
 			-- now call __onEventName for the object
 			eventName = eventName:gsub("^%l", string.upper)
 
 			local triggeredEvent = "__on"..eventName
 
 			if l.params then
+				--print("l.listener, triggeredEvent, params", l.listener, triggeredEvent, unpack(l.params))
 				l.listener[triggeredEvent](l.listener, unpack(l.params))
 			else
+				--print("l.listener, triggeredEvent", l.listener, triggeredEvent)
 				l.listener[triggeredEvent](l.listener)
 			end
 		end
 	end
+	print("done triggering", eventName)
 end
 
 function _D.__checkLayersForProp(x, y)
@@ -118,17 +141,18 @@ function _D.__clickOrTouch(x,y)
 	--------------------------------------------------------------------
 	propTouched = _D.__checkLayersForProp(x, y)
 
-	-- copy the listeners table
+	-- copy the listeners table so we don't trigger new events added during this process.
+	-- Why isn't a deepcopy necessary? I should try to understand this.
 	local tListeners = {}
-	for k, listener in pairs(_D.touchListeners) do
-		tListeners[k] = listener
+	for k, l in pairs(_D.touchListeners) do
+		tListeners[k] = l
+		print("_D.touchListeners k,v,prop", k, l, l.prop)
 	end
-
 	-- tell all objects listening that this prop has been touched
-	for k, listener in pairs(tListeners) do 
-		if propTouched == listener.prop then
+	for k, l in pairs(tListeners) do 
+		if propTouched == l.prop then
 			-- now tell the object it's time to respond
-			for k, l in pairs(tListeners) do
+			--for k, l in pairs(tListeners) do
 				-- if listener is not persistent, have the object stop listening
 				if not l.persistent then
 					_D.touchListeners[k] = nil
@@ -137,12 +161,19 @@ function _D.__clickOrTouch(x,y)
 				-- now call __onEventName for the object
 				local eventName = l.event:gsub("^%l", string.upper)
 				local triggeredEvent = "__on"..eventName
-				if l.params then
-					l.listener[triggeredEvent](l.listener, unpack(l.params))
-				else
-					l.listener[triggeredEvent](l.listener)
-				end
-			end
+
+				-- this works because:
+				-- "foo and bar or nil" will return the last thing looked at, and will stop looking
+				-- at the statement when either something is true, or the end is reached.
+				-- if foo, it checks bar
+				-- if foo and bar, it returns bar (last thing looked at)
+				-- if either foo or bar are false, it returns nil (it hit the end, and nil was the
+				-- last thing looked at)
+				-- if nil were instead baz, then
+				-- if baz is true, it stops looking and baz is returned
+				-- if baz is false, it hits the end of the statement and baz is returned (last checked)
+				l.listener[triggeredEvent](l.listener, unpack(l.params or {}))
+			--end
 		end
 	end	
 end

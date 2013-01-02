@@ -52,8 +52,8 @@ end
 -- 	conv.script = _C.__setupScriptDefaults(script)
 -- end
 
-function _C.__nextNode(conv, currentKey)
-	-- Returns the key and value of the next conversation node. If no current key
+function _C:__nextNode(conv, currentKey)
+	-- Returns the key of the next conversation node. If no current key
 	-- is provided, the root (entry point) will be returned.
     if currentKey then
         if type(currentKey) == "string" then
@@ -62,7 +62,7 @@ function _C.__nextNode(conv, currentKey)
             currentKey = 3 
         else currentKey = currentKey + 1 end
     else currentKey = "root" end
-    return currentKey, conv[currentKey]
+    return currentKey
 end
 
 function _C:__goToNode(n)
@@ -74,8 +74,7 @@ function _C:__goToNode(n)
 	self.speakerSprite = self.__displaySpeakerSprite( self.currentNode.portrait )
 
 	-- wait for touches
-	LLDispatcher.registerTouchListener(self, self.speakerTextTextbox, "textboxTapped", self.speakerTextTextbox)
-	-- LLDispatcher.registerEventListener(self.speakerTextTextbox, "boxTapped" )
+	LLDispatcher.registerPersistentTouchListener(self, self.speakerTextTextbox, "advanceBox", self.speakerTextTextbox, "nodeTextFinished")
 	LLDispatcher.registerEventListener(self, "nodeTextFinished")
 end
 
@@ -223,28 +222,94 @@ function _C:__checkConditionals(node)
 end
 
 function _C:__getNodeItems(node)
-	-- add item to inventory
-	-- display notification about item
-	-- wait for touch
-	-- add next item to inv.
-	if node.getItem then
-		item, qty = next(node.getItem)
+	-- Add all node items to player inventory, displaying notifications about each one.
+	if self.currentNode.getItem and not node then
+		item, qty = next(self.currentNode.getItem)
 		if item then
 			self:__getItem(item, qty)
 			-- after the item is gained and notification cleared, check for items again
-			--LLDispatcher.registerEventListener(self, "notificationCleared", "__getNodeItems", node )
+			LLDispatcher.registerEventListener(self, "notificationCleared", "__getNodeItems" )
+		else
+			self.currentNode.getItem = nil
+			LLDispatcher.triggerEvent("allNodeItemsGained")
 		end
+	elseif self.currentNode.getItem then
+		print("node was set on __getNodeItems")
 	end
 end
 
 function _C:__getItem(item, qty)
 	table.insert (Player.items , { [item] = 1, })
 	local text = "Got item: "..item
-
 	self.currentNode.getItem[item] = nil
-	self:__displayNotification("Got item: "..item)
-	--TouchDispatcher.registerListener(self, notificationTextBox, "clearNotification", box, false, TouchDispatcher.CONVERSATION_NOTIFICATION_PRIORITY)
-	--TouchDispatcher.registerListener(self, speakerTextTextbox, "displayNotification", text)
+	self:__displayNotification(text)
+end
+
+function _C:__setNodeVars(node)
+	-- Set all node variables. Player should not be notified.
+	if node.setVar then
+		for var, value in pairs(node.setVar) do
+			Player.variables[var] = value
+		end
+		node.setVar = nil
+	end
+	if node.changeVar then
+		for var, value in pairs(node.changeVar) do
+			Player.variables[variable] = Player.variables[variable] + value
+		end
+		node.changeVar = nil
+	end
+	LLDispatcher.triggerEvent("allNodeVarsSet")
+end
+
+function _C:__setNodeStats(node)
+	-- Set all node stats and notify player of changes
+	if node.setStat then
+		stat, value = next(node.setStat)
+		if stat then
+			self:__setStat(stat,value)
+			-- after the stat is gained and notification cleared, check stats again
+			LLDispatcher.registerEventListener(self, "notificationCleared", "__setNodeStats", node )
+		else
+			node.setStat = nil
+			-- all setStats have been processed, now check again for changeStats
+			self:__setNodeStats(node)
+		end
+	elseif node.changeStat then
+		stat, value = next(node.changeStat)
+		if stat then
+			self:__changeStat(stat,value)
+			-- after the stat is gained and notification cleared, check stats again
+			LLDispatcher.registerEventListener(self, "notificationCleared", "__setNodeStats", node )
+		else
+			node.changeStat = nil
+			-- all setStats have been processed, run again to finish
+			self:__setNodeStats(node)
+		end
+	else
+		-- if setStat and changeStat are both nil, all stats have been processed
+		LLDispatcher.triggerEvent("allNodeStatsSet")
+	end
+end
+
+function _C:__setStat(stat, value)
+	Player[stat] = value
+	local text = stat.." is now "..value
+	self.currentNode.setStat[stat] = nil
+	self:__displayNotification(text)
+end
+
+function _C:__changeStat(stat, value)
+	Player[stat] = Player[stat] + value
+	if value < 0 then
+		operator = " decreased by "
+	else
+		operator = " increased by "
+	end
+
+	local text = stat..operator..value
+	self.currentNode.changeStat[stat] = nil
+	self:__displayNotification(text)
 end
 
 function _C:__displayNotification(text)
@@ -252,17 +317,22 @@ function _C:__displayNotification(text)
 	local notificationBG = Meshes2D.newRect( 40 , 215 , 280 , 260 , gradient1 )
 	PopupLayer:insertProp( notificationBG )
 
-	local notificationTextbox = MOAITextBox.new ()
-	notificationTextbox:setStyle ( newStyle ( defaultFont , 44 ))
-	notificationTextbox:setRect ( 45 , 220 , 275 , 255 )
-	notificationTextbox:setAlignment ( MOAITextBox.CENTER_JUSTIFY, MOAITextBox.CENTER_JUSTIFY )
-	notificationTextbox:setYFlip(true)
-	PopupLayer:insertProp ( notificationTextbox )
-	notificationTextbox:setString(text)
-	self.notificationVisible = true
-	
-	LLDispatcher.registerTouchListener(self, notificationTextbox, "clearNotification")
-	LLDispatcher.registerTouchListener(self, self.speakerTextTextbox, "clearNotification")
+	self.notificationTextbox = MOAITextBox.new ()
+	self.notificationTextbox:setStyle ( newStyle ( defaultFont , 44 ))
+	self.notificationTextbox:setRect ( 45 , 220 , 275 , 255 )
+	self.notificationTextbox:setAlignment ( MOAITextBox.CENTER_JUSTIFY, MOAITextBox.CENTER_JUSTIFY )
+	self.notificationTextbox:setYFlip(true)
+	PopupLayer:insertProp ( self.notificationTextbox )
+	self.notificationTextbox:setString(text)
+
+	print(text, self.notificationTextbox:more())
+
+	-- register "advanceBox" listener for notification textbox,
+	-- triggering "clearNotification" when the box is done.
+	LLDispatcher.registerPersistentTouchListener(self, self.notificationTextbox, "advanceBox", self.notificationTextbox, "clearNotification", true)
+	LLDispatcher.registerPersistentTouchListener(self, self.speakerTextTextbox, "advanceBox", self.notificationTextbox, "clearNotification", true)
+	-- start listening for the clearNotification event
+	LLDispatcher.registerEventListener(self, "clearNotification")
 end
 
 --------------------------------------------------------------------
@@ -273,26 +343,33 @@ end
 --------------------------------------------------------------------
 --------------------------------------------------------------------
 
-function _C:__onTextboxTapped(box)
-	if box:isBusy() then
-		box:stop()
-		box:revealAll()
-		LLDispatcher.registerTouchListener(self, box, "textboxTapped", box)
-	elseif box:more() then
-		box:nextPage()
-		box:spool()
-		LLDispatcher.registerTouchListener(self, box, "textboxTapped", box)
-	else
-		LLDispatcher.triggerEvent("nodeTextFinished")
-	end
-end
-
 function _C:__onClearNotification()
 	PopupLayer:clear()
-	-- self.notificationVisible = false
-	-- TouchDispatcher.removeListenersForEvent("clearNotification")
-	-- EventDispatcher.triggerEvent("notificationCleared")
+	LLDispatcher.removeListenersForProp(self.notificationTextbox)
+	LLDispatcher.removeListenersForProp(self.speakerTextTextbox)
+	print("triggering notificationCleared")
 	LLDispatcher.triggerEvent("notificationCleared")
+end
+
+function _C:__onAdvanceBox(box, callback, noSpool)
+	print("__onAdvanceBox", box, callback)
+	if box:isBusy() then
+		print("box is busy")
+		box:stop()
+		box:revealAll()
+	elseif box:more() then
+		print("box has more text")
+		box:nextPage()
+		if noSpool then
+			box:revealAll()
+		else
+			box:spool()
+		end
+	else
+		-- box is done, now trigger the 'done' event
+		LLDispatcher.removeListenersForProp(box)
+		LLDispatcher.triggerEvent(callback)
+	end
 end
 
 --------------------------------------------------------------------
@@ -312,27 +389,51 @@ function _C:__onStartConversation(node)
 		self:__goToNode(node)
 	else
 		-- Load the first node
-		self.currentNodeKey, _ = self.__nextNode(self.script)
+		self.currentNodeKey = self:__nextNode(self.script)
 		self:__goToNode(self.currentNodeKey)
 	end
+end
+
+function _C:__onTextboxFinished()
+
 end
 
 function _C:__onNodeTextFinished()
 	-- Process conditionals first, because they may add other things to do.
 	self:__checkConditionals(self.currentNode)
 
-	if self.currentNode.getItem then self:__getNodeItems(self.currentNode) end
+	-- We're going to process items first, then vars, then stats
+	if self.currentNode.getItem then 
+		self:__getNodeItems()
+		LLDispatcher.registerEventListener(self, "allNodeItemsGained")
+	else
+		self:__onAllNodeItemsGained()
+	end
+end
 
-	if self.currentNode.setVar then
-		for k,v in pairs(self.currentNode.setVar) do
-			self.__setVar(k,v)
-		end
+function _C:__onAllNodeItemsGained()
+	-- Items were processed, now vars, then stats
+	if self.currentNode.setVar or self.currentNode.changeVar then 
+		self:__setNodeVars(self.currentNode)
+		LLDispatcher.registerEventListener(self, "allNodeVarsSet")
+	else
+		self:__onAllNodeVarsSet()
 	end
-	if self.currentNode.changeStat then
-		for k,v in pairs(self.currentNode.changeStat) do
-			self.__changeStat(k,v)
-		end
+end
+
+function _C:__onAllNodeVarsSet()
+	-- Variables have been set, now it's time to do stats
+	if self.currentNode.setStat or self.currentNode.changeStat then 
+		self:__setNodeStats(self.currentNode)
+		LLDispatcher.registerEventListener(self, "allNodeStatsSet")
+	else
+		self:__onAllNodeStatsSet()
 	end
+end
+
+function _C:__onAllNodeStatsSet()
+	-- All processing has been done on the node, so now we exit
+	self:__goToNode(self:__nextNode(self.script, self.currentNodeKey))
 end
 
 function _C:__onNotificationCleared(action, ...)

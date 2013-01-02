@@ -7,13 +7,13 @@ local _C = {
 	},
 	root = {
 		text = "Hi, I'm Joe. Take this sonic screwdriver.",
-		getItem = { ["sonic screwdriver"] = 1, },
+		getItem = { ["sonic screwdriver"] = 1, ["sexy rubber duckie"] = 1, ["BIG BLACK DICK"] = 1 },
 	},
 	[3] = {
 		text = "I have to give you one other thing. What do you want?",
 		choices = {
 			["rubber duckie"] = {
-				getItem = { ["rubber duckie"] = 1, ["sexy rubber duckie"] = 1, ["BIG BLACK DICK"] = 1 },
+				getItem = { ["rubber duckie"] = 1, },
 				setVar = { itemName = "rubber duckie", },
 				goToNode = 4,
 			},
