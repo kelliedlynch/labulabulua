@@ -7,7 +7,7 @@ local _C = {
 	},
 	root = {
 		text = "Hi, I'm Joe. Take this sonic screwdriver.",
-		getItem = { ["sonic screwdriver"] = 1, ["sexy rubber duckie"] = 1, ["BIG BLACK DICK"] = 1 },
+		getItem = { ["sonic screwdriver"] = 1, ["another thing"] = 5 },
 	},
 	[3] = {
 		text = "I have to give you one other thing. What do you want?",

@@ -16,24 +16,29 @@ viewport:setOffset ( -1, -1 ) -- offset projection origin by -1, 1 in OpenGL pro
 --------------------------------------------------------------------
 
 -- Layer for background images
-BackgroundLayer = MOAILayer.new ()
-BackgroundLayer:setViewport ( viewport )
-MOAISim.pushRenderPass ( BackgroundLayer )
+BackgroundLayer = MOAILayer.new()
+BackgroundLayer:setViewport(viewport)
+MOAISim.pushRenderPass(BackgroundLayer)
 
 -- Layer for character sprites and animations
-SpriteLayer = MOAILayer.new ()
-SpriteLayer:setViewport ( viewport )
-MOAISim.pushRenderPass ( SpriteLayer )
+SpriteLayer = MOAILayer.new()
+SpriteLayer:setViewport(viewport)
+MOAISim.pushRenderPass(SpriteLayer)
 
 -- Layer for conversation and hub windows
-WindowLayer = MOAILayer.new ()
-WindowLayer:setViewport ( viewport )
-MOAISim.pushRenderPass ( WindowLayer )
+WindowLayer = MOAILayer.new()
+WindowLayer:setViewport(viewport)
+MOAISim.pushRenderPass(WindowLayer)
+
+-- Layer for conversation menus
+MenuLayer = MOAILayer.new()
+MenuLayer:setViewport(viewport)
+MOAISim.pushRenderPass(MenuLayer)
 
 -- Layer for popup notifications in conversations and hub
-PopupLayer = MOAILayer.new ()
-PopupLayer:setViewport ( viewport )
-MOAISim.pushRenderPass ( PopupLayer )
+PopupLayer = MOAILayer.new()
+PopupLayer:setViewport(viewport)
+MOAISim.pushRenderPass(PopupLayer)
 
 
 -- Load game fonts
@@ -78,13 +83,6 @@ require "DrawClean/utils/lang"
 Meshes2D = require "DrawClean/draw/meshes2D"
 
 Player = require "player"
-
--- -- Load the touch dispatcher
--- TouchDispatcher = require "LLTouchDispatcher"
--- TouchDispatcher.beginListening()
-
--- -- Load the event dispatcher
--- EventDispatcher = require "LLEventDispatcher"
 
 -- Load combined dispatcher
 LLDispatcher = require "LLDispatch"

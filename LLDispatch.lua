@@ -14,7 +14,7 @@ function _D.registerTouchListener( objectListening, propTouched, eventToFire, ..
 	-- touched. By default, a touch listener will only catch the first
 	-- touch event, then it will stop listening.
 	--------------------------------------------------------------------
-	print("registering", objectListening, propTouched, eventToFire, ...)
+	--print("registering", objectListening, propTouched, eventToFire, ...)
 	table.insert(_D.touchListeners, { 
 		listener = objectListening,
 		prop = propTouched,
@@ -28,10 +28,10 @@ function _D.registerPersistentTouchListener( ... )
 	-- A persistent touch listener will continue to respond to touches
 	-- until it is told not to.
 	--------------------------------------------------------------------
-	print("persistent touch listener arguments", ...)
-	print("#listeners", #_D.touchListeners)
+	--print("persistent touch listener arguments", ...)
+	--print("#listeners", #_D.touchListeners)
 	_D.registerTouchListener(...)
-	print("#listeners", #_D.touchListeners)
+	--print("#listeners", #_D.touchListeners)
 	_D.touchListeners[#_D.touchListeners].persistent = true
 end
 
@@ -41,12 +41,15 @@ function _D.registerEventListener( objectListening, eventName, ... )
 	-- event. By default, an event listener will only respond the first
 	-- time an event is triggered, then it will stop listening.
 	--------------------------------------------------------------------
-	print("registering", eventName)
+	--print("registering", eventName)
 	table.insert(_D.eventListeners, {
 		listener = objectListening,
 		event = eventName,
 		params = {...},
 		})
+	for k,v in pairs(_D.eventListeners) do
+		--print("listeners table", v.listener, v.event)
+	end
 end
 
 function _D.registerPersistentEventListener( ... )
@@ -77,24 +80,22 @@ function _D.triggerEvent( eventName )
 	-- local eListeners = deepcopy(_D.eventListeners)
 	local eListeners = {}
 	for k, listener in pairs(_D.eventListeners) do
+		--print("listeners", pairs(listener))
 		eListeners[k] = listener
 	end
 	print("triggering", eventName)
 	for k, l in pairs(eListeners) do
-		--print(eventName, l.event)
+		--print("eventName, l.event, l.listener",eventName, l.event, l.listener)
 		if eventName == l.event then
 			-- if listener is not persistent, have the object stop listening
 			if not l.persistent then
 				_D.eventListeners[k] = nil
 			end
-			-- print("listeners")
-			-- for k,v in pairs(_D.eventListeners) do
-			-- 	print(k,v)
-			-- end
-			-- now call __onEventName for the object
-			eventName = eventName:gsub("^%l", string.upper)
 
-			local triggeredEvent = "__on"..eventName
+			-- now call __onEventName for the object
+			
+
+			local triggeredEvent = "__on"..eventName:gsub("^%l", string.upper)
 
 			if l.params then
 				--print("l.listener, triggeredEvent, params", l.listener, triggeredEvent, unpack(l.params))
@@ -105,7 +106,7 @@ function _D.triggerEvent( eventName )
 			end
 		end
 	end
-	print("done triggering", eventName)
+	--print("done triggering", eventName)
 end
 
 function _D.__checkLayersForProp(x, y)
@@ -115,6 +116,8 @@ function _D.__checkLayersForProp(x, y)
 	x, y, z = BackgroundLayer:wndToWorld(x,y)
 	if _D.__checkLayer(PopupLayer, x, y, z) then
 		return _D.__checkLayer(PopupLayer, x, y, z)
+	elseif _D.__checkLayer(MenuLayer, x, y, z) then
+		return _D.__checkLayer(MenuLayer, x, y, z)
 	elseif _D.__checkLayer(WindowLayer, x, y, z) then
 		return _D.__checkLayer(WindowLayer, x, y, z)
 	elseif _D.__checkLayer(SpriteLayer, x, y, z) then
@@ -127,8 +130,25 @@ end
 
 function _D.__checkLayer(layer, x, y, z)
 	local partition = layer:getPartition()
+	--print("partition", partition)
 	if partition then
-		return partition:propForPoint(x, y, z, MOAILayer.SORT_PRIORITY_ASCENDING)
+		--has a prop been touched?
+		--print("prop list", partition:propListForPoint(x, y, z, MOAILayer.SORT_PRIORITY_ASCENDING))
+		props = {partition:propListForPoint(x, y, z, MOAILayer.SORT_PRIORITY_ASCENDING)}
+		if props then
+			-- we're going to have to check all props under this point
+			for k, prop in pairs(props) do
+				-- is this prop listening for touches?
+				for k, listener in pairs(_D.touchListeners) do
+					-- check each listener for the prop
+					if prop == listener.prop then
+						return prop
+					end
+				end
+			end
+		end
+		--no lisening props were found on this layer for this point
+		return nil
 	end
 	return false
 end
@@ -146,8 +166,9 @@ function _D.__clickOrTouch(x,y)
 	local tListeners = {}
 	for k, l in pairs(_D.touchListeners) do
 		tListeners[k] = l
-		print("_D.touchListeners k,v,prop", k, l, l.prop)
+		--print("_D.touchListeners k,v,prop", k, l, l.prop)
 	end
+
 	-- tell all objects listening that this prop has been touched
 	for k, l in pairs(tListeners) do 
 		if propTouched == l.prop then
@@ -172,7 +193,9 @@ function _D.__clickOrTouch(x,y)
 				-- if nil were instead baz, then
 				-- if baz is true, it stops looking and baz is returned
 				-- if baz is false, it hits the end of the statement and baz is returned (last checked)
-				l.listener[triggeredEvent](l.listener, unpack(l.params or {}))
+				-- l.listener[triggeredEvent](l.listener, unpack(l.params or {}))
+				print("trying to trigger event:", triggeredEvent)
+				l.listener[triggeredEvent](l.listener, propTouched)
 			--end
 		end
 	end	

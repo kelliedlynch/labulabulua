@@ -3,13 +3,21 @@ local _C = {}
 _C.__index = _C
 
 --------------------------------------------------------------------
+-- Conversation States
+--------------------------------------------------------------------
+
+CHARACTER_SPEAKING = 1
+MENU_VISIBLE = 2
+NOTIFICATION_VISIBLE = 3
+
+--------------------------------------------------------------------
 --------------------------------------------------------------------
 --
 -- Public Functions
 --
 --------------------------------------------------------------------
 --------------------------------------------------------------------
-function _C.new(file)
+function _C.new(file, node)
 	--------------------------------------------------------------------
 	-- Create a new conversation object from the specified script file
 	--------------------------------------------------------------------
@@ -20,8 +28,11 @@ function _C.new(file)
 	local script = require ("Resources/Conversations/"..file)
 	conv.script = _C.__setupScriptDefaults(script)
 
+	conv.currentState = {}
+	conv.notificationQueue = {}
+
 	-- Begin listening for the startConversation event
-	LLDispatcher.registerEventListener(conv, "startConversation")
+	LLDispatcher.registerEventListener(conv, "startConversation", node)
 
 	return conv
 end
@@ -45,14 +56,12 @@ function _C.__setupScriptDefaults(script)
 	return script
 end
 
--- Function for switching scripts mid-conversation. Might also be used
--- when first loading conversation. Examine later.
--- function _C.__changeScript(file, node)
--- 	local script = require ("Resources/Conversations/"..file)
--- 	conv.script = _C.__setupScriptDefaults(script)
--- end
+function _C:__goToConversation(file, node)
+	self.script = _C.__setupScriptDefaults(require ("Resources/Conversations/"..file))
+	self:__goToNode(node or self:__nextNode())
+end
 
-function _C:__nextNode(conv, currentKey)
+function _C:__nextNode(currentKey)
 	-- Returns the key of the next conversation node. If no current key
 	-- is provided, the root (entry point) will be returned.
     if currentKey then
@@ -67,59 +76,77 @@ end
 
 function _C:__goToNode(n)
 	-- draw all the node elements
+	self.oldNode = self.currentNode
 	self.currentNodeKey , self.currentNode = n , deepcopy(self.script[n])
-	self.background = self.__displayBackground(self.currentNode.background)
+	self.background = self:__displayBackground(self.currentNode.background)
 	self.speakerNameBox = self:__drawSpeakerNameBox(self.currentNode.speaker)
+	self.speakerSprite = self:__displaySpeakerSprite(self.currentNode.portrait)
 	self.speakerTextTextbox = self:__drawMainTextBox(self.currentNode.text)
-	self.speakerSprite = self.__displaySpeakerSprite( self.currentNode.portrait )
 
 	-- wait for touches
-	LLDispatcher.registerPersistentTouchListener(self, self.speakerTextTextbox, "advanceBox", self.speakerTextTextbox, "nodeTextFinished")
+	self.currentState[CHARACTER_SPEAKING] = true
 	LLDispatcher.registerEventListener(self, "nodeTextFinished")
 end
 
-function _C.__displayBackground(img)
-	if img == "" then return nil end
-
-	local spriteTexture = MOAITexture.new()
-	spriteTexture:load("Resources/Images/"..img)
-
-	local gfxQuad = MOAIGfxQuad2D.new()
-	gfxQuad:setTexture (spriteTexture)
-	gfxQuad:setRect (0, 0, screenWidth, screenHeight)
-
-	--------------------------------------------------------------------
-	-- The following will make room003.png display properly if it is
-	-- padded out to power-of-2 dimensions (1024 x 2048). Look into this
-	-- later; optimizing textures may improve performance.
-	--------------------------------------------------------------------
-	-- gfxQuad:setQuad (0, 683, 381, 683, 381, 0, 0, 0)
-
-	local prop = MOAIProp2D.new ()
-	prop:setDeck(gfxQuad)
-	BackgroundLayer:insertProp(prop)
-
-	return prop
+function _C:__setNextConversationNode(n)
+	self.currentNode.nextConversationNode = n
 end
 
-function _C.__displaySpeakerSprite(img)
-	if img == "" then return nil end
-	local spriteTexture = MOAITexture.new()
-	spriteTexture:load ( "Resources/Images/"..img )
-	local texX, texY = spriteTexture:getSize()
-	local scaleFactor = texY / 380
-	texX = texX / scaleFactor
-	texY = texY / scaleFactor
+function _C:__displayBackground(img)
+	if self.oldNode and img == self.oldNode.background then
+		return self.background
+	else
+		LLDispatcher.removeListenersForProp(self.background)
+		BackgroundLayer:clear()
+		if img == "" then 
+			return nil 
+		end
 
-	local gfxQuad = MOAIGfxQuad2D.new ()
-	gfxQuad:setTexture ( spriteTexture )
-	gfxQuad:setRect ( screenWidth / 2 - texX / 2 , 0 , screenWidth / 2 + texX / 2 , texY  )
+		local spriteTexture = MOAITexture.new()
+		spriteTexture:load("Resources/Images/"..img)
 
-	local prop = MOAIProp2D.new ()
-	prop:setDeck ( gfxQuad )
-	SpriteLayer:insertProp ( prop )
+		local gfxQuad = MOAIGfxQuad2D.new()
+		gfxQuad:setTexture (spriteTexture)
+		gfxQuad:setRect (0, 0, screenWidth, screenHeight)
 
-	return prop
+		--------------------------------------------------------------------
+		-- The following will make room003.png display properly if it is
+		-- padded out to power-of-2 dimensions (1024 x 2048). Look into this
+		-- later; optimizing textures may improve performance.
+		--------------------------------------------------------------------
+		-- gfxQuad:setQuad (0, 683, 381, 683, 381, 0, 0, 0)
+
+		local prop = MOAIProp2D.new ()
+		prop:setDeck(gfxQuad)
+		BackgroundLayer:insertProp(prop)
+		LLDispatcher.registerPersistentTouchListener(self, prop, "screenTouched")
+		return prop
+	end
+end
+
+function _C:__displaySpeakerSprite(img)
+	if self.oldNode and img == self.oldNode.portrait then
+		return self.speakerSprite
+	else
+		SpriteLayer:clear()
+		if img == "" then return nil end
+		local spriteTexture = MOAITexture.new()
+		spriteTexture:load ( "Resources/Images/"..img )
+		local texX, texY = spriteTexture:getSize()
+		local scaleFactor = texY / 380
+		texX = texX / scaleFactor
+		texY = texY / scaleFactor
+
+		local gfxQuad = MOAIGfxQuad2D.new ()
+		gfxQuad:setTexture ( spriteTexture )
+		gfxQuad:setRect ( screenWidth / 2 - texX / 2 , 0 , screenWidth / 2 + texX / 2 , texY  )
+
+		local prop = MOAIProp2D.new ()
+		prop:setDeck ( gfxQuad )
+		SpriteLayer:insertProp ( prop )
+
+		return prop
+	end
 end
 
 function _C:__drawSpeakerNameBox(name)
@@ -186,7 +213,14 @@ function _C:__scrollText(text, tbox)
 end
 
 --------------------------------------------------------------------
+--------------------------------------------------------------------
+--
 -- Functions for processing end-of-node stuff
+--
+-- All this stuff should stay together; it all happens in the order
+-- laid out.
+--
+--------------------------------------------------------------------
 --------------------------------------------------------------------
 
 function _C:__checkConditionals(node)
@@ -224,71 +258,82 @@ end
 function _C:__getNodeItems(node)
 	-- Add all node items to player inventory, displaying notifications about each one.
 	if self.currentNode.getItem and not node then
-		item, qty = next(self.currentNode.getItem)
-		if item then
+		for item, qty in pairs(self.currentNode.getItem) do
 			self:__getItem(item, qty)
-			-- after the item is gained and notification cleared, check for items again
-			LLDispatcher.registerEventListener(self, "notificationCleared", "__getNodeItems" )
-		else
-			self.currentNode.getItem = nil
-			LLDispatcher.triggerEvent("allNodeItemsGained")
 		end
+		self.currentNode.getItem = nil
 	elseif self.currentNode.getItem then
 		print("node was set on __getNodeItems")
 	end
 end
 
+function _C:__getSpecifiedItems(items)
+	-- add all items from a list to the player's inventory
+	for item, qty in pairs(items) do
+		self:__getItem(item, qty)
+	end
+end
+
 function _C:__getItem(item, qty)
+	-- get a single item and add it to the player's inventory
 	table.insert (Player.items , { [item] = 1, })
-	local text = "Got item: "..item
-	self.currentNode.getItem[item] = nil
+	local qtyMod
+	if qty > 1 then
+		qtyMod = " x"..qty
+	end
+	local text = "Got item: "..item..(qtyMod or "")
+
+	for k, i in pairs(Player.items) do
+		for name, q in pairs(i) do
+			if name == item then
+				Player.items[k][name] = Player.items[k][name] + qty
+			end
+		end
+	end
+
+	-- if self.currentNode.getItem then
+	-- 	self.currentNode.getItem[item] = nil
+	-- end
 	self:__displayNotification(text)
 end
 
 function _C:__setNodeVars(node)
 	-- Set all node variables. Player should not be notified.
 	if node.setVar then
-		for var, value in pairs(node.setVar) do
-			Player.variables[var] = value
-		end
+		self.__setVar(node.setVar)
 		node.setVar = nil
 	end
 	if node.changeVar then
-		for var, value in pairs(node.changeVar) do
-			Player.variables[variable] = Player.variables[variable] + value
-		end
+		self.__changeVar(node.changeVar)
 		node.changeVar = nil
 	end
-	LLDispatcher.triggerEvent("allNodeVarsSet")
+end
+
+function _C:__setVar(vars)
+	for var, value in pairs(vars) do
+		Player.variables[var] = value
+	end
+end
+
+function _C:__changeVar(vars)
+	for var, value in pairs(vars) do
+		Player.variables[variable] = Player.variables[variable] + value
+	end
 end
 
 function _C:__setNodeStats(node)
 	-- Set all node stats and notify player of changes
 	if node.setStat then
-		stat, value = next(node.setStat)
-		if stat then
+		for stat, value in pairs(node.setStat) do
 			self:__setStat(stat,value)
-			-- after the stat is gained and notification cleared, check stats again
-			LLDispatcher.registerEventListener(self, "notificationCleared", "__setNodeStats", node )
-		else
-			node.setStat = nil
-			-- all setStats have been processed, now check again for changeStats
-			self:__setNodeStats(node)
 		end
-	elseif node.changeStat then
-		stat, value = next(node.changeStat)
-		if stat then
+		node.setStat = nil
+	end
+	if node.changeStat then
+		for stat, value in pairs(node.changeStat) do
 			self:__changeStat(stat,value)
-			-- after the stat is gained and notification cleared, check stats again
-			LLDispatcher.registerEventListener(self, "notificationCleared", "__setNodeStats", node )
-		else
-			node.changeStat = nil
-			-- all setStats have been processed, run again to finish
-			self:__setNodeStats(node)
 		end
-	else
-		-- if setStat and changeStat are both nil, all stats have been processed
-		LLDispatcher.triggerEvent("allNodeStatsSet")
+		node.changeStat = nil
 	end
 end
 
@@ -312,7 +357,48 @@ function _C:__changeStat(stat, value)
 	self:__displayNotification(text)
 end
 
+--------------------------------------------------------------------
+-- End of end-of-node processing
+--------------------------------------------------------------------
+
+function _C:__displayChoices ()
+	for choice, actions in pairs(self.currentNode.choices) do
+	 	for action, data in pairs(actions) do
+	 		if action == "getItem" then
+	 			self.currentNode.choices[choice]["getSpecifiedItems"] = self.currentNode.choices[choice]["getItem"]
+	 			self.currentNode.choices[choice]["getItem"] = nil
+	 		end
+	 		if action == "goToNode" then
+	 			self.currentNode.choices[choice]["setNextConversationNode"] = self.currentNode.choices[choice]["goToNode"]
+	 			self.currentNode.choices[choice]["goToNode"] = nil
+	 		end
+	 	end
+	end
+	self.menu = LLMenu.new()
+	self.menu:makeMenu(self, MenuLayer, self.currentNode.choices)
+	self.currentState[MENU_VISIBLE] = true
+	LLDispatcher.registerEventListener(self, "removeMenu")
+end
+
+function _C:__onRemoveMenu()
+	self.currentState[MENU_VISIBLE] = nil
+	if self.currentNode.nextConversationNode and not self.currentState[NOTIFICATION_VISIBLE] then
+		self:__goToNode(self.currentNode.nextConversationNode)
+	end
+end
+
 function _C:__displayNotification(text)
+	print("running __displayNotification")
+	if self.currentState[NOTIFICATION_VISIBLE] then
+		table.insert(self.notificationQueue, text)
+		return
+	elseif #self.notificationQueue == 0 then
+		-- if there's no queue, then this is the first notification queued
+		-- registering listener for all notifications cleared
+		print("registering allNotificationsCleared")
+		LLDispatcher.registerEventListener(self, "allNotificationsCleared")
+	end
+
 	local gradient1 = Meshes2D.newGradient( "#CC33CC", "#0099FF", 45 )
 	local notificationBG = Meshes2D.newRect( 40 , 215 , 280 , 260 , gradient1 )
 	PopupLayer:insertProp( notificationBG )
@@ -325,14 +411,26 @@ function _C:__displayNotification(text)
 	PopupLayer:insertProp ( self.notificationTextbox )
 	self.notificationTextbox:setString(text)
 
-	print(text, self.notificationTextbox:more())
-
-	-- register "advanceBox" listener for notification textbox,
-	-- triggering "clearNotification" when the box is done.
-	LLDispatcher.registerPersistentTouchListener(self, self.notificationTextbox, "advanceBox", self.notificationTextbox, "clearNotification", true)
-	LLDispatcher.registerPersistentTouchListener(self, self.speakerTextTextbox, "advanceBox", self.notificationTextbox, "clearNotification", true)
+	self.currentState[NOTIFICATION_VISIBLE] = true
 	-- start listening for the clearNotification event
 	LLDispatcher.registerEventListener(self, "clearNotification")
+end
+
+function _C:__onClearNotification()
+	PopupLayer:clear()
+	LLDispatcher.removeListenersForProp(self.notificationTextbox)
+	LLDispatcher.removeListenersForProp(self.speakerTextTextbox)
+	self.currentState[NOTIFICATION_VISIBLE] = nil
+
+	-- if there are still notifications to display, go right on to the next one
+	print("queued notifications",#self.notificationQueue)
+	if #self.notificationQueue > 0 then
+		k, text = next(self.notificationQueue)
+		self:__displayNotification(text)
+		table.remove(self.notificationQueue, k)
+	else
+		LLDispatcher.triggerEvent("allNotificationsCleared")
+	end
 end
 
 --------------------------------------------------------------------
@@ -343,22 +441,29 @@ end
 --------------------------------------------------------------------
 --------------------------------------------------------------------
 
-function _C:__onClearNotification()
-	PopupLayer:clear()
-	LLDispatcher.removeListenersForProp(self.notificationTextbox)
-	LLDispatcher.removeListenersForProp(self.speakerTextTextbox)
-	print("triggering notificationCleared")
-	LLDispatcher.triggerEvent("notificationCleared")
+function _C:__onScreenTouched()
+	for k,v in pairs(self.currentState) do
+		print("state",k,v)
+	end
+	if self.currentState[CHARACTER_SPEAKING] then
+		self:__advanceBox(self.speakerTextTextbox, "nodeTextFinished")
+	elseif self.currentState[NOTIFICATION_VISIBLE] then
+		self:__advanceBox(self.notificationTextbox, "clearNotification", true)
+	elseif not self.currentState[MENU_VISIBLE] then
+		self:__exitNode()
+	end
 end
 
-function _C:__onAdvanceBox(box, callback, noSpool)
-	print("__onAdvanceBox", box, callback)
+function _C:__advanceBox(box, callback, noSpool)
+	--------------------------------------------------------------------
+	-- Advances a textbox. Displays all text if it's currently scrolling
+	-- or displays next page if there is one. Fires callback event on
+	-- completion.
+	--------------------------------------------------------------------
 	if box:isBusy() then
-		print("box is busy")
 		box:stop()
 		box:revealAll()
 	elseif box:more() then
-		print("box has more text")
 		box:nextPage()
 		if noSpool then
 			box:revealAll()
@@ -367,7 +472,7 @@ function _C:__onAdvanceBox(box, callback, noSpool)
 		end
 	else
 		-- box is done, now trigger the 'done' event
-		LLDispatcher.removeListenersForProp(box)
+		--LLDispatcher.removeListenersForProp(box)
 		LLDispatcher.triggerEvent(callback)
 	end
 end
@@ -389,59 +494,62 @@ function _C:__onStartConversation(node)
 		self:__goToNode(node)
 	else
 		-- Load the first node
-		self.currentNodeKey = self:__nextNode(self.script)
+		self.currentNodeKey = self:__nextNode()
 		self:__goToNode(self.currentNodeKey)
 	end
 end
 
-function _C:__onTextboxFinished()
-
-end
+--------------------------------------------------------------------
+-- End-of-node event responders
+--------------------------------------------------------------------
 
 function _C:__onNodeTextFinished()
+	self.currentState[CHARACTER_SPEAKING] = nil
 	-- Process conditionals first, because they may add other things to do.
 	self:__checkConditionals(self.currentNode)
 
 	-- We're going to process items first, then vars, then stats
 	if self.currentNode.getItem then 
 		self:__getNodeItems()
-		LLDispatcher.registerEventListener(self, "allNodeItemsGained")
-	else
-		self:__onAllNodeItemsGained()
 	end
-end
-
-function _C:__onAllNodeItemsGained()
-	-- Items were processed, now vars, then stats
 	if self.currentNode.setVar or self.currentNode.changeVar then 
 		self:__setNodeVars(self.currentNode)
-		LLDispatcher.registerEventListener(self, "allNodeVarsSet")
-	else
-		self:__onAllNodeVarsSet()
 	end
-end
 
-function _C:__onAllNodeVarsSet()
-	-- Variables have been set, now it's time to do stats
 	if self.currentNode.setStat or self.currentNode.changeStat then 
 		self:__setNodeStats(self.currentNode)
-		LLDispatcher.registerEventListener(self, "allNodeStatsSet")
-	else
-		self:__onAllNodeStatsSet()
+	end
+
+	if self.currentNode.choices then
+		self:__displayChoices()
+	elseif not self.currentState[NOTIFICATION_VISIBLE] then
+		print("notification not visible, exiting node")
+		self:__exitNode()
 	end
 end
 
-function _C:__onAllNodeStatsSet()
+function _C:__exitNode()
 	-- All processing has been done on the node, so now we exit
-	self:__goToNode(self:__nextNode(self.script, self.currentNodeKey))
+	if self.currentNode.exit then
+		print("end of conversation")
+	elseif self.currentNode.goToNode then
+		self:__goToNode(self.currentNode["goToNode"])
+	elseif self.currentNode.nextConversationNode then
+		self:__goToNode(self.currentNode.nextConversationNode)
+	elseif self.currentNode.goToConv then
+		self.__goToConversation(self, self.currentNode.goToConv.file , self.currentNode.goToConv.node)
+	else
+		print("going to next node")
+		self:__goToNode(self:__nextNode(self.currentNodeKey))
+	end
 end
 
-function _C:__onNotificationCleared(action, ...)
-	--------------------------------------------------------------------
-	-- Responder for notificationCleared events. Takes a function name
-	-- and a table of parameters, even if function only takes one param
-	--------------------------------------------------------------------
-	self[action](self, ...)
+function _C:__onAllNotificationsCleared()
+	self:__exitNode()
 end
+
+--------------------------------------------------------------------
+-- End end-of-node event responders
+--------------------------------------------------------------------
 
 return _C
