@@ -4,6 +4,7 @@ local _C = {
 		portrait = "joe001portrait.png",
 		background = "room003.png",
 		text = "default text",
+		music = "potion_shop.ogg",
 	},
 	root = {
 		text = "Hi, I'm Joe. Take this sonic screwdriver.",

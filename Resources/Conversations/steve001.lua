@@ -4,10 +4,11 @@ local _C = {
 		portrait = "steve001portrait.png",
 		background = "room002.png",
 		text = "default text",
+		music = "nintendo.ogg",
 	},
 	root = {
 		speaker = "",
-		text = "Basic dialogue with no speaker. Let's make it longer so that we can test paging. Text, text, lots of text. I hope this is enough. Let's do one more sentence, just to be sure. And one more, because even after increasing the font size, that wasn't enough. Sheesh.",
+		text = "Basic dialogue with no {sound::crash.ogg}speaker. {var1} {var2} {var3} {unknown}Let's make it longer so that we can test paging. Text, text, lots of text. I hope this is enough. Let's do one more sentence, just to be sure. And one more, because even after increasing the font size, that wasn't enough. Sheesh.",
 		portrait = "",
 	},
 	[3] = {
@@ -49,12 +50,14 @@ local _C = {
 		portrait = "steve003portrait.png",
 		text = "Let's take a bath!",
 		background = "bubblebath.png",
+		getItem = { ["rubber duckie"] = -1, },
 		goToNode = 11,
 	},
 	[10] = {
 		portrait = "steve003portrait.png",
 		text = "Let's get bubblegum!",
 		background = "gumballmachine.png",
+		getItem = { ["shiny nickel"] = -1, },
 		goToNode = 11,
 	},
 	[11] = {

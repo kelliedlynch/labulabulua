@@ -12,6 +12,19 @@ viewport:setScale ( 320, 480 ) -- use negative Y axis
 viewport:setOffset ( -1, -1 ) -- offset projection origin by -1, 1 in OpenGL projection space
 
 --------------------------------------------------------------------
+-- Sounds and stuff
+--------------------------------------------------------------------
+
+MOAIUntzSystem.initialize()
+MOAIUntzSystem.setVolume(1)
+
+--------------------------------------------------------------------
+-- Macros for Dialogue Actions
+--------------------------------------------------------------------
+
+LLMacros = require "LLMacros"
+
+--------------------------------------------------------------------
 -- Initialize Game Layers
 --------------------------------------------------------------------
 
@@ -40,7 +53,9 @@ PopupLayer = MOAILayer.new()
 PopupLayer:setViewport(viewport)
 MOAISim.pushRenderPass(PopupLayer)
 
-
+--------------------------------------------------------------------
+-- Text Handling Stuff
+--------------------------------------------------------------------
 -- Load game fonts
 charcodes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;!?()&/-'
 defaultFont = MOAIFont.new ()
@@ -59,7 +74,6 @@ function newStyle ( font, size, scale )
 	end
 	return style;
 end
-
 
 function deepcopy(orig)
 	-- deepcopy function from lua-users wiki
@@ -94,7 +108,7 @@ LLConversation = require "LLConversation"
 
 --require "test"
 
-conversation = LLConversation.new("joe001")
+conversation = LLConversation.new("steve001")
 
 --goToConversation("steve001")
 thread = MOAIThread.new()

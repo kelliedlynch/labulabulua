@@ -82,6 +82,8 @@ function _C:__goToNode(n)
 	self.speakerNameBox = self:__drawSpeakerNameBox(self.currentNode.speaker)
 	self.speakerSprite = self:__displaySpeakerSprite(self.currentNode.portrait)
 	self.speakerTextTextbox = self:__drawMainTextBox(self.currentNode.text)
+	self.currentMusic = self:__setCurrentMusic(self.currentNode.music)
+
 
 	-- wait for touches
 	self.currentState[CHARACTER_SPEAKING] = true
@@ -189,28 +191,107 @@ function _C:__drawMainTextBox(text)
 		mainTextbox:setAlignment(MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
 		mainTextbox:setYFlip(true)
 		WindowLayer:insertProp(mainTextbox)
+		revealedCharacters = 0
+		mainTextbox:setSpeed(Player.settings.textSpeed)
 		self:__scrollText(text, mainTextbox)
+		
 		return mainTextbox
 	end
 	return nil
 end
 
+function _C:__setCurrentMusic(file)
+	if self.oldNode and file == self.oldNode.music then
+		return self.currentMusic
+	else
+		if self.currentMusic then self.currentMusic:stop() end
+		local music = MOAIUntzSound.new()
+		music:load("Resources/Music/"..self.currentNode.music)
+		music:play()
+		return music
+	end
+end
+
 --------------------------------------------------------------------
 -- Functions for processing text in conversation dialogue
 --------------------------------------------------------------------
-function _C.__replaceVariables(str)
-	local formatted, count = string.gsub(str, "{([^}]+)}", 
-		function(varName)
-			return Player.variables[varName]
+function _C:__replaceVariables(str)
+	local formatted, c = string.gsub(str, "{([^}]+)}", self.__subVars )
+	local macroFormatted, count = string.gsub(formatted, "{([^}]+::[^}]+)}", self.__subMacros )
+	if count > 0 then
+		-- find the position at which each macro occurred and pass it to the macro function
+		for i=1, count, 1 do
+			local b, e = string.find(macroFormatted, "`")
+			LLMacros.currentMacros[i].position = b
+			macroFormatted = string.sub(macroFormatted, 1, b-1)..string.sub(macroFormatted, e+1)
+			print(b)
+		end 
+	end
+	return macroFormatted
+end
+
+function _C.__subVars(...)
+	if ... then
+		local subs = {}
+		for k, varName in pairs({...}) do
+			if Player.variables[varName] then
+				table.insert(subs, Player.variables[varName])
+			else
+				table.insert(subs, "{"..varName.."}")
+			end
 		end
-		)
-	return formatted
+		return unpack(subs)
+	end
+	return ...
+end
+
+function _C.__subMacros(...)
+	print(...)
+	if ... then
+		local subs = {}
+		for k, macro in pairs({...}) do
+			local b, e = string.find(macro, "::" )
+			local macroName = string.sub(macro, 1, b-1)
+			local macroArg = string.sub(macro, e+1)
+			if LLMacros[macroName] then
+				table.insert(LLMacros.currentMacros, { name = macroName, arg = macroArg })
+				table.insert(subs, "`")
+			else
+				table.insert(subs, "{"..macroName.."}")
+			end
+		end
+		return unpack(subs)
+	end
+	return ...
 end
 
 function _C:__scrollText(text, tbox)
-	tbox:setString (self.__replaceVariables(text))
-	tbox:spool ()
+	tbox:setString (self:__replaceVariables(text))
+	tbox:spool()
+	if LLMacros.currentMacros then
+		for k, v in pairs(LLMacros.currentMacros) do
+			if v.position > 1 then pos = v.position-1 else pos = v.position end
+			--delay = pos / Player.settings.textSpeed*.825
+			delay = pos / Player.settings.textSpeed*82
+			self:__performWithDelay(delay, LLMacros.sound )
+		end
+	end
+	LLMacros.currentMacros = nil
 end
+
+function _C:__performWithDelay ( delay, func )
+
+	local t = MOAITimer.new()
+	t:setSpan(delay/100)
+
+	t:setListener( MOAITimer.EVENT_TIMER_END_SPAN,
+		function()      
+	   		func()
+    	end
+    )
+	t:start()
+end
+
 
 --------------------------------------------------------------------
 --------------------------------------------------------------------
@@ -255,7 +336,7 @@ function _C:__checkConditionals(node)
 	end
 end
 
-function _C:__getNodeItems(node)
+function _C:__processNodeItems(node)
 	-- Add all node items to player inventory, displaying notifications about each one.
 	if self.currentNode.getItem and not node then
 		for item, qty in pairs(self.currentNode.getItem) do
@@ -263,7 +344,7 @@ function _C:__getNodeItems(node)
 		end
 		self.currentNode.getItem = nil
 	elseif self.currentNode.getItem then
-		print("node was set on __getNodeItems")
+		print("node was set on __processNodeItems")
 	end
 end
 
@@ -275,26 +356,46 @@ function _C:__getSpecifiedItems(items)
 end
 
 function _C:__getItem(item, qty)
-	-- get a single item and add it to the player's inventory
-	table.insert (Player.items , { [item] = 1, })
-	local qtyMod
-	if qty > 1 then
-		qtyMod = " x"..qty
+	if qty == 0 then return end
+	
+	local txt_qty = math.abs(qty)
+	if txt_qty > 1 then
+		txt_qty = " x"..txt_qty
+	else
+		txt_qty = ""
 	end
-	local text = "Got item: "..item..(qtyMod or "")
 
+	if qty > 0 then
+		txt_act = "Gained item: "
+	else
+		txt_act = "Lost item: "
+	end
+
+	local itemInTable = false
+	-- check the player's existing items; if player already has some of these items,
+	-- change the quantity
 	for k, i in pairs(Player.items) do
 		for name, q in pairs(i) do
 			if name == item then
 				Player.items[k][name] = Player.items[k][name] + qty
+				if Player.items[k][name] == 0 then
+					Player.items[k][name] = nil
+				end
+				itemInTable = true
 			end
 		end
 	end
+	-- if player didn't have any of these items, insert them (or do nothing if 
+	-- quantity is zero)
+	if not itemInTable then
+		if qty > 0 then table.insert (Player.items , { [item] = qty, }) end
+		if qty < 0 then 
+			print("Error: trying to descrease quantity of non-existent item")
+			return
+		end
+	end
 
-	-- if self.currentNode.getItem then
-	-- 	self.currentNode.getItem[item] = nil
-	-- end
-	self:__displayNotification(text)
+	self:__displayNotification(txt_act..item..txt_qty)
 end
 
 function _C:__setNodeVars(node)
@@ -509,8 +610,8 @@ function _C:__onNodeTextFinished()
 	self:__checkConditionals(self.currentNode)
 
 	-- We're going to process items first, then vars, then stats
-	if self.currentNode.getItem then 
-		self:__getNodeItems()
+	if self.currentNode.getItem or self.currentNode.loseItem then 
+		self:__processNodeItems()
 	end
 	if self.currentNode.setVar or self.currentNode.changeVar then 
 		self:__setNodeVars(self.currentNode)
