@@ -3,7 +3,7 @@
 local _SH = {}
 _SH.shadersList = {}
 
-_SH.SHADERS_DIRECTORY = "DrawClean/draw/shaders/"
+_SH.SHADERS_DIRECTORY = "Library/DrawClean/draw/shaders/"
 _SH.BASIC_COLOR_SHADER = "simpleColor"
 
 function _SH.simpleColor( self )

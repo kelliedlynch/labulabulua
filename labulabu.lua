@@ -1,3 +1,12 @@
+--------------------------------------------------------------------
+-- Load Libraries
+--------------------------------------------------------------------
+-- DrawClean polygon library
+require "Library/DrawClean/utils/lang"
+Meshes2D = require "Library/DrawClean/draw/meshes2D"
+-- Flower library (general-purpose functions)
+Flower = require "Library/flower"
+
 -- Create the window
 screenWidth = MOAIEnvironment.horizontalResolution
 screenHeight = MOAIEnvironment.verticalResolution
@@ -75,6 +84,10 @@ function newStyle ( font, size, scale )
 	return style;
 end
 
+--require "LLTextbox"
+LLTextbox = require "LLTextbox"
+--LLTextbox = LLT.make()
+
 function deepcopy(orig)
 	-- deepcopy function from lua-users wiki
     local orig_type = type(orig)
@@ -91,11 +104,6 @@ function deepcopy(orig)
     return copy
 end
 
--- Load DrawClean polygon library
-require "DrawClean/utils/lang"
--- Load meshes file
-Meshes2D = require "DrawClean/draw/meshes2D"
-
 Player = require "player"
 
 -- Load combined dispatcher
@@ -108,7 +116,7 @@ LLConversation = require "LLConversation"
 
 --require "test"
 
-conversation = LLConversation.new("steve001")
+conversation = LLConversation.new("steve001", 12)
 
 --goToConversation("steve001")
 thread = MOAIThread.new()

@@ -8,7 +8,7 @@ local _C = {
 	},
 	root = {
 		speaker = "",
-		text = "Basic dialogue with no {sound::crash.ogg}speaker. {var1} {var2} {var3} {unknown}Let's make it longer so that we can test paging. Text, text, lots of text. I hope this is enough. Let's do one more sentence, just to be sure. And one more, because even after increasing the font size, that wasn't enough. Sheesh.",
+		text = "Basic dialogue with no speaker. Let's make it longer so that we can test paging. Text, text, lots of text. I hope this is enough. Let's do one more sentence, just to be sure. And one more, because even after increasing the font size, that wasn't enough. Sheesh.",
 		portrait = "",
 	},
 	[3] = {
@@ -63,8 +63,14 @@ local _C = {
 	[11] = {
 		text = "Well, that was silly.",
 		changeStat = { silliness = 1, },
+	},
+	[12] = {
+	--{sound::crash.wav}{shake::steve001portrait.png}
+	-- after 20 chars, delay should be 1.111, but is actually 1.18333
+	-- .06666 .05 .06667 .05 .05 .06666 
+		text = "I see he gave you a sonic screwdriver. Try pointing it at the chandelier.",
 		goToNode = 3,
-	}
+	},
 }
 
 return _C

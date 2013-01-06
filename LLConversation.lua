@@ -2,6 +2,8 @@ local _C = {}
 
 _C.__index = _C
 
+_C.activeProps = {}
+
 --------------------------------------------------------------------
 -- Conversation States
 --------------------------------------------------------------------
@@ -82,7 +84,7 @@ function _C:__goToNode(n)
 	self.speakerNameBox = self:__drawSpeakerNameBox(self.currentNode.speaker)
 	self.speakerSprite = self:__displaySpeakerSprite(self.currentNode.portrait)
 	self.speakerTextTextbox = self:__drawMainTextBox(self.currentNode.text)
-	self.currentMusic = self:__setCurrentMusic(self.currentNode.music)
+	--self.currentMusic = self:__setCurrentMusic(self.currentNode.music)
 
 
 	-- wait for touches
@@ -146,7 +148,7 @@ function _C:__displaySpeakerSprite(img)
 		local prop = MOAIProp2D.new ()
 		prop:setDeck ( gfxQuad )
 		SpriteLayer:insertProp ( prop )
-
+		self.activeProps[img] = prop
 		return prop
 	end
 end
@@ -185,7 +187,8 @@ function _C:__drawMainTextBox(text)
 		local mainTextBG = Meshes2D.newRect( 10 , 10 , 300 , 150 , gradient )
 		WindowLayer:insertProp( mainTextBG )
 
-		local mainTextbox = MOAITextBox.new()
+		local mainTextbox = MOAITextBox:new()
+		--mainTextbox.foo()
 		mainTextbox:setStyle(newStyle(defaultFont, 38 ))
 		mainTextbox:setRect(20 , 20 , 290 , 140 )
 		mainTextbox:setAlignment(MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
@@ -224,7 +227,7 @@ function _C:__replaceVariables(str)
 			local b, e = string.find(macroFormatted, "`")
 			LLMacros.currentMacros[i].position = b
 			macroFormatted = string.sub(macroFormatted, 1, b-1)..string.sub(macroFormatted, e+1)
-			print(b)
+			--print(b)
 		end 
 	end
 	return macroFormatted
@@ -246,7 +249,7 @@ function _C.__subVars(...)
 end
 
 function _C.__subMacros(...)
-	print(...)
+	--print(...)
 	if ... then
 		local subs = {}
 		for k, macro in pairs({...}) do
@@ -267,26 +270,39 @@ end
 
 function _C:__scrollText(text, tbox)
 	tbox:setString (self:__replaceVariables(text))
-	tbox:spool()
+	
 	if LLMacros.currentMacros then
+		local pauseDelay = 0
+		--local pauseDelay = -(Player.settings.textSpeed/100)
+		p = 0
 		for k, v in pairs(LLMacros.currentMacros) do
-			if v.position > 1 then pos = v.position-1 else pos = v.position end
+			local pos
+			pos = v.position
+			--if v.position > 1 then pos = v.position-1 else pos = v.position end
 			--delay = pos / Player.settings.textSpeed*.825
-			delay = pos / Player.settings.textSpeed*82
-			self:__performWithDelay(delay, LLMacros.sound )
+			delay = (pos / (Player.settings.textSpeed) ) + pauseDelay
+			self:__performWithDelay(delay, LLMacros[v.name], v.arg )
+			-- if that action was a pause, we need to increase the delay of all following
+			-- macros by an appropriate amount.
+			if v.name == "pause" then
+				pauseDelay = pauseDelay + v.arg/100
+			end
 		end
 	end
+	local action = tbox:spool()
 	LLMacros.currentMacros = nil
 end
 
-function _C:__performWithDelay ( delay, func )
-
+function _C:__performWithDelay ( delay, func, arg )
 	local t = MOAITimer.new()
-	t:setSpan(delay/100)
+	t:setSpan(delay)
 
 	t:setListener( MOAITimer.EVENT_TIMER_END_SPAN,
 		function()      
-	   		func()
+	   		func(arg)
+	   		p = t:getTime() - p
+
+	   		print(p)
     	end
     )
 	t:start()
@@ -562,8 +578,9 @@ function _C:__advanceBox(box, callback, noSpool)
 	-- completion.
 	--------------------------------------------------------------------
 	if box:isBusy() then
-		box:stop()
-		box:revealAll()
+		--box:stop()
+		--box:revealAll()
+		box:scroll()
 	elseif box:more() then
 		box:nextPage()
 		if noSpool then

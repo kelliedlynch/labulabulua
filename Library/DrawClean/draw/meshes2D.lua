@@ -21,8 +21,8 @@ To Do -maybe-:
 -	Rework this module to create decks instead of props, and reuse them.
 ]]
 
-local Shaders = require "DrawClean/draw/basicShaders"
-local Triangulation = require "DrawClean/draw/triangulation"
+local Shaders = require "Library/DrawClean/draw/basicShaders"
+local Triangulation = require "Library/DrawClean/draw/triangulation"
 
 
 local _M = {}

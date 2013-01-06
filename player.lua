@@ -6,7 +6,7 @@ _P.variables = { var1 = "foo", var2 = "bar", var3 = "a third variable" }
 _P.silliness = 5
 
 _P.settings = {
-	textSpeed = 12
+	textSpeed = 18
 }
 
 function _P:playerName()
