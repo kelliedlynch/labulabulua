@@ -474,6 +474,12 @@ function _C:__changeStat(stat, value)
 	self:__displayNotification(text)
 end
 
+function _C:__exitActions(node)
+	for action, target in pairs(node.exitAction) do
+		LLMacros[action](target)
+	end
+end
+
 --------------------------------------------------------------------
 -- End of end-of-node processing
 --------------------------------------------------------------------
@@ -636,6 +642,10 @@ function _C:__onNodeTextFinished()
 
 	if self.currentNode.setStat or self.currentNode.changeStat then 
 		self:__setNodeStats(self.currentNode)
+	end
+
+	if self.currentNode.exitAction then
+		self:__exitActions(self.currentNode)
 	end
 
 	if self.currentNode.choices then

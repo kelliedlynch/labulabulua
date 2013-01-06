@@ -68,6 +68,11 @@ local _C = {
 	--{sound::crash.wav}{shake::steve001portrait.png}
 	-- after 20 chars, delay should be 1.111, but is actually 1.18333
 	-- .06666 .05 .06667 .05 .05 .06666 
+		enterAction = {},
+		exitAction = {
+			sound = "crash.wav"
+			shake = "steve001portrait.png"
+		},
 		text = "I see he gave you a sonic screwdriver. Try pointing it at the chandelier.",
 		goToNode = 3,
 	},
