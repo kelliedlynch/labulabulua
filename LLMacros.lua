@@ -51,43 +51,21 @@ function _M.fromLeft(newActor, existingActors)
 end
 
 function _M.toLeft(leavingActor, existingActors)
-	print("animating to left")
-	
 	local action, actorLeft, xx, yy
+	local texX = leavingActor:getDims()
+	xx, yy = -texX, 0
+	action = leavingActor:seekLoc(xx, yy, .5)
+	action:start()
 	for k, actor in pairs(existingActors) do
-		print("k, leavingActor, actor.prop", k, leavingActor, actor.prop)
-		if leavingActor == actor.prop then
-			local texX = leavingActor:getDims()
-			--xx, yy = leavingActor:worldToModel(-texX, 0)
-			xx, yy = -texX, 0
-			actorLeft = true
-
-			print("leaving original", -texX, 0)
-			print("leaving xx,yy", xx, yy, actor.img)
-		else
-			local texX = actor.prop:getDims()
-			print("k, #existingActors", k, #existingActors)
-			local x = _M.__getSpriteXPos( texX, k - (actorLeft and 1 or 0), #existingActors -1 )
-			--xx, yy = actor.prop:worldToModel(x, 0)
-			xx, yy = x, 0
-			print("staying original", x, 0)
-			print("staying xx,yy", xx, yy, actor.img)
-		end
-		
-		
-		--local xx, yy = actor.prop:worldToModel(x, 0)
-		--local x, y = actor.prop:modelToWorld(xx,yy)
+		local texX = actor.prop:getDims()
+		local x = _M.__getSpriteXPos( texX, k, #existingActors )
+		xx, yy = x, 0
 		action = actor.prop:seekLoc(xx, yy, .5)
 		action:start()
 	end
-	-- --local xPos = _M.__getSpriteXPos(texX, 1, #existingActors + 1)
-	-- local xx, yy = newActor:worldToModel(-texX, 0)
-	-- local action2 = newActor:seekLoc(xx, yy, .5)
-	-- action2:start()
 end
 
 function _M.__getSpriteXPos(texX, count, total)
-	print("__getSpriteXPos", texX, count, total)
 	local xPos
 	if total == 1 then xPos = screenWidth / 2 - texX / 2
 	elseif total == 2 then

@@ -125,23 +125,23 @@ end
 
 function _C:__populateSpriteLayer()
 	-- if nothing has changed, do nothing
-	local matches = 0
-	if self.oldNode then
-		if #self.actors == #self.currentNode.portrait then
-			local matches = 0
-			for k,actor in pairs(self.actors) do
-				for k, sprite2 in pairs(self.currentNode.portrait) do
-					if actor.img == sprite2 then
-						matches = matches + 1
-					end
-				end
-			end
-			if matches == #self.actors and not self.currentNode.addCharacter then
-				-- all sprites are the same, and nothing is being added
-				return self.actors
-			end
-		end
-	end
+	-- local matches = 0
+	-- if self.oldNode then
+	-- 	if #self.actors == #self.currentNode.portrait then
+	-- 		local matches = 0
+	-- 		for k,actor in pairs(self.actors) do
+	-- 			for k, sprite2 in pairs(self.currentNode.portrait) do
+	-- 				if actor.img == sprite2 then
+	-- 					matches = matches + 1
+	-- 				end
+	-- 			end
+	-- 		end
+	-- 		if matches == #self.actors and not self.currentNode.addCharacter then
+	-- 			-- all sprites are the same, and nothing is being added
+	-- 			return self.actors
+	-- 		end
+	-- 	end
+	-- end
 	if self.currentNode.portrait then
 		-- either there is no previous node, or something has changed. Redraw
 		-- all sprites from scratch.
@@ -502,15 +502,11 @@ function _C:__onTextDoneSpooling()
 	end
 	local a = {}
 	if self.currentNode.removeCharacter then
-		print("removeCharacter exists")
 		for k, img in pairs(self.currentNode.removeCharacter.portrait) do
-			print("portrait", img)
 			for k, actor in pairs(self.actors) do
-				print("actor", actor.prop)
 				if img == actor.img then
-					print("images match")
-					LLMacros[self.currentNode.removeCharacter.animate](actor.prop, self.actors)
 					table.remove(self.actors, k)
+					LLMacros[self.currentNode.removeCharacter.animate](actor.prop, self.actors)
 				end
 				
 			end

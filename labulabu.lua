@@ -8,15 +8,20 @@ Meshes2D = require "Library/DrawClean/draw/meshes2D"
 Flower = require "Library/flower"
 
 -- Create the window
-screenWidth = MOAIEnvironment.horizontalResolution
-screenHeight = MOAIEnvironment.verticalResolution
-if screenWidth == nil then screenWidth =320 end
-if screenHeight == nil then screenHeight = 480 end
-MOAISim.openWindow ( "LabuLabu", screenWidth, screenHeight )
+local deviceWidth = MOAIEnvironment.horizontalResolution
+local deviceHeight = MOAIEnvironment.verticalResolution
+if deviceWidth == nil then deviceWidth =320 end
+if deviceHeight == nil then deviceHeight = 480 end
+MOAISim.openWindow ( "LabuLabu", deviceWidth, deviceHeight )
+
+--MOAIDebugLines.setStyle ( MOAIDebugLines.PROP_MODEL_BOUNDS, 5, 1, 0, 0 )
+--MOAIDebugLines.setStyle ( MOAIDebugLines.PROP_WORLD_BOUNDS, 3, 0, 0, 1 )
+
 
 -- Create the viewport
 viewport = MOAIViewport.new ()
-viewport:setSize ( screenWidth , screenHeight )
+viewport:setSize ( deviceWidth , deviceHeight )
+screenWidth, screenHeight = 320, 480
 viewport:setScale ( 320, 480 ) -- use negative Y axis
 viewport:setOffset ( -1, -1 ) -- offset projection origin by -1, 1 in OpenGL projection space
 
@@ -116,7 +121,7 @@ LLConversation = require "LLConversation"
 
 --require "test"
 
-conversation = LLConversation.new("steve001", 14)
+conversation = LLConversation.new("steve001" )
 
 --goToConversation("steve001")
 thread = MOAIThread.new()
