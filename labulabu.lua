@@ -116,7 +116,7 @@ LLConversation = require "LLConversation"
 
 --require "test"
 
-conversation = LLConversation.new("steve001", 12)
+conversation = LLConversation.new("steve001", 14)
 
 --goToConversation("steve001")
 thread = MOAIThread.new()

@@ -1,6 +1,7 @@
 local _P = {}
 
 _P.name = "Superstar"
+_P.player = "Superstar"
 _P.items = {}
 _P.variables = { var1 = "foo", var2 = "bar", var3 = "a third variable" }
 _P.silliness = 5

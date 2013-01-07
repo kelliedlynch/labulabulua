@@ -2,7 +2,7 @@ local _C = {}
 
 _C.__index = _C
 
-_C.activeProps = {}
+_C.actors = {}
 
 --------------------------------------------------------------------
 -- Conversation States
@@ -12,13 +12,6 @@ CHARACTER_SPEAKING = 1
 MENU_VISIBLE = 2
 NOTIFICATION_VISIBLE = 3
 
---------------------------------------------------------------------
---------------------------------------------------------------------
---
--- Public Functions
---
---------------------------------------------------------------------
---------------------------------------------------------------------
 function _C.new(file, node)
 	--------------------------------------------------------------------
 	-- Create a new conversation object from the specified script file
@@ -82,10 +75,12 @@ function _C:__goToNode(n)
 	self.currentNodeKey , self.currentNode = n , deepcopy(self.script[n])
 	self.background = self:__displayBackground(self.currentNode.background)
 	self.speakerNameBox = self:__drawSpeakerNameBox(self.currentNode.speaker)
-	self.speakerSprite = self:__displaySpeakerSprite(self.currentNode.portrait)
+	self.actors = self:__populateSpriteLayer(self.currentNode.portrait)
+	for k,v in pairs(self.actors) do
+		print("actors", k, v)
+	end
 	self.speakerTextTextbox = self:__drawMainTextBox(self.currentNode.text)
-	--self.currentMusic = self:__setCurrentMusic(self.currentNode.music)
-
+	self.currentMusic = self:__setCurrentMusic(self.currentNode.music)
 
 	-- wait for touches
 	self.currentState[CHARACTER_SPEAKING] = true
@@ -128,11 +123,55 @@ function _C:__displayBackground(img)
 	end
 end
 
-function _C:__displaySpeakerSprite(img)
-	if self.oldNode and img == self.oldNode.portrait then
-		return self.speakerSprite
-	else
+function _C:__populateSpriteLayer()
+	-- if nothing has changed, do nothing
+	local matches = 0
+	if self.oldNode then
+		if #self.actors == #self.currentNode.portrait then
+			local matches = 0
+			for k,actor in pairs(self.actors) do
+				for k, sprite2 in pairs(self.currentNode.portrait) do
+					if actor.img == sprite2 then
+						matches = matches + 1
+					end
+				end
+			end
+			if matches == #self.actors and not self.currentNode.addCharacter then
+				-- all sprites are the same, and nothing is being added
+				return self.actors
+			end
+		end
+	end
+	if self.currentNode.portrait then
+		-- either there is no previous node, or something has changed. Redraw
+		-- all sprites from scratch.
 		SpriteLayer:clear()
+		self.actors = {}
+		for k, img in pairs(self.currentNode.portrait) do
+			table.insert(self.actors, { img = img, prop = self:__displaySprite(img, k, #self.currentNode.portrait) })
+		end
+	end
+	-- at this point, all existing sprites should be on the screen. Now we add any new ones.
+	local a = {}
+	if self.currentNode.addCharacter then
+		for k, img in pairs(self.currentNode.addCharacter.portrait) do
+			local newActor = self:__displaySprite(img)
+			if self.currentNode.addCharacter.animate then
+				LLMacros[self.currentNode.addCharacter.animate](newActor, self.actors)
+			end
+			table.insert(a, newActor)
+			table.insert(self.actors, { img = img, prop = newActor })
+		end
+
+	end
+	return self.actors
+end
+
+function _C:__displaySprite(img, count, total)
+		--------------------------------------------------------------------
+		-- Load and draw a new sprite. If count and total are not set, the
+		-- sprite will be drawn off-screen.
+		--------------------------------------------------------------------
 		if img == "" then return nil end
 		local spriteTexture = MOAITexture.new()
 		spriteTexture:load ( "Resources/Images/"..img )
@@ -140,17 +179,47 @@ function _C:__displaySpeakerSprite(img)
 		local scaleFactor = texY / 380
 		texX = texX / scaleFactor
 		texY = texY / scaleFactor
+		local xPos
+		if not count and not total then
+			xPos = -texX
+		else
+			xPos = self:__getSpriteXPos(texX, count, total)
+		end
 
 		local gfxQuad = MOAIGfxQuad2D.new ()
 		gfxQuad:setTexture ( spriteTexture )
-		gfxQuad:setRect ( screenWidth / 2 - texX / 2 , 0 , screenWidth / 2 + texX / 2 , texY  )
+		gfxQuad:setRect ( 0, 0 , texX , texY  )
 
 		local prop = MOAIProp2D.new ()
 		prop:setDeck ( gfxQuad )
+		print("xPos when drawing", xPos)
+		prop:setLoc(xPos, 0)
 		SpriteLayer:insertProp ( prop )
-		self.activeProps[img] = prop
+		prop:setParent(window)
+		--self.actors[img] = prop
 		return prop
+end
+
+function _C:__getSpriteXPos(texX, count, total)
+	local xPos
+	if total == 1 then xPos = screenWidth / 2 - texX / 2
+	elseif total == 2 then
+		if count == 1 then xPos = screenWidth / 4 - texX / 2
+		elseif count == 2 then xPos = (screenWidth / 4) * 3 - texX / 2
+		end
+	elseif total == 3 then
+		if count == 1 then xPos = screenWidth / 6  - texX / 2
+		elseif count == 2 then xPos = (screenWidth / 6 ) * 3  - texX / 2
+		elseif count == 3 then xPos = (screenWidth / 6 ) * 5 - texX / 2
+		end
+	else
+		return nil
 	end
+	return xPos
+end
+
+function _C:__addCharacter(img)
+
 end
 
 function _C:__drawSpeakerNameBox(name)
@@ -194,7 +263,6 @@ function _C:__drawMainTextBox(text)
 		mainTextbox:setAlignment(MOAITextBox.LEFT_JUSTIFY, MOAITextBox.LEFT_JUSTIFY)
 		mainTextbox:setYFlip(true)
 		WindowLayer:insertProp(mainTextbox)
-		revealedCharacters = 0
 		mainTextbox:setSpeed(Player.settings.textSpeed)
 		self:__scrollText(text, mainTextbox)
 		
@@ -220,17 +288,7 @@ end
 --------------------------------------------------------------------
 function _C:__replaceVariables(str)
 	local formatted, c = string.gsub(str, "{([^}]+)}", self.__subVars )
-	local macroFormatted, count = string.gsub(formatted, "{([^}]+::[^}]+)}", self.__subMacros )
-	if count > 0 then
-		-- find the position at which each macro occurred and pass it to the macro function
-		for i=1, count, 1 do
-			local b, e = string.find(macroFormatted, "`")
-			LLMacros.currentMacros[i].position = b
-			macroFormatted = string.sub(macroFormatted, 1, b-1)..string.sub(macroFormatted, e+1)
-			--print(b)
-		end 
-	end
-	return macroFormatted
+	return formatted
 end
 
 function _C.__subVars(...)
@@ -239,6 +297,8 @@ function _C.__subVars(...)
 		for k, varName in pairs({...}) do
 			if Player.variables[varName] then
 				table.insert(subs, Player.variables[varName])
+			elseif Player[varName] then
+				table.insert(subs, Player[varName])
 			else
 				table.insert(subs, "{"..varName.."}")
 			end
@@ -248,66 +308,26 @@ function _C.__subVars(...)
 	return ...
 end
 
-function _C.__subMacros(...)
-	--print(...)
-	if ... then
-		local subs = {}
-		for k, macro in pairs({...}) do
-			local b, e = string.find(macro, "::" )
-			local macroName = string.sub(macro, 1, b-1)
-			local macroArg = string.sub(macro, e+1)
-			if LLMacros[macroName] then
-				table.insert(LLMacros.currentMacros, { name = macroName, arg = macroArg })
-				table.insert(subs, "`")
-			else
-				table.insert(subs, "{"..macroName.."}")
-			end
-		end
-		return unpack(subs)
-	end
-	return ...
-end
-
 function _C:__scrollText(text, tbox)
+	self:__runEnterActions()
 	tbox:setString (self:__replaceVariables(text))
-	
-	if LLMacros.currentMacros then
-		local pauseDelay = 0
-		--local pauseDelay = -(Player.settings.textSpeed/100)
-		p = 0
-		for k, v in pairs(LLMacros.currentMacros) do
-			local pos
-			pos = v.position
-			--if v.position > 1 then pos = v.position-1 else pos = v.position end
-			--delay = pos / Player.settings.textSpeed*.825
-			delay = (pos / (Player.settings.textSpeed) ) + pauseDelay
-			self:__performWithDelay(delay, LLMacros[v.name], v.arg )
-			-- if that action was a pause, we need to increase the delay of all following
-			-- macros by an appropriate amount.
-			if v.name == "pause" then
-				pauseDelay = pauseDelay + v.arg/100
-			end
-		end
-	end
+	LLDispatcher.registerEventListener(self, "textDoneSpooling")
+
 	local action = tbox:spool()
+	action:setListener(MOAIAction.EVENT_STOP, function() 
+			LLDispatcher.triggerEvent("textDoneSpooling")
+		end)
+
 	LLMacros.currentMacros = nil
 end
 
-function _C:__performWithDelay ( delay, func, arg )
-	local t = MOAITimer.new()
-	t:setSpan(delay)
-
-	t:setListener( MOAITimer.EVENT_TIMER_END_SPAN,
-		function()      
-	   		func(arg)
-	   		p = t:getTime() - p
-
-	   		print(p)
-    	end
-    )
-	t:start()
+function _C:__runEnterActions()
+	if self.currentNode.enterAction then
+		for action, target in pairs(self.currentNode.enterAction) do
+			LLMacros[action](target)
+		end
+	end
 end
-
 
 --------------------------------------------------------------------
 --------------------------------------------------------------------
@@ -474,9 +494,27 @@ function _C:__changeStat(stat, value)
 	self:__displayNotification(text)
 end
 
-function _C:__exitActions(node)
-	for action, target in pairs(node.exitAction) do
-		LLMacros[action](target)
+function _C:__onTextDoneSpooling()
+	if self.currentNode.exitAction then
+		for action, target in pairs(self.currentNode.exitAction) do
+			LLMacros[action](target)
+		end
+	end
+	local a = {}
+	if self.currentNode.removeCharacter then
+		print("removeCharacter exists")
+		for k, img in pairs(self.currentNode.removeCharacter.portrait) do
+			print("portrait", img)
+			for k, actor in pairs(self.actors) do
+				print("actor", actor.prop)
+				if img == actor.img then
+					print("images match")
+					LLMacros[self.currentNode.removeCharacter.animate](actor.prop, self.actors)
+					table.remove(self.actors, k)
+				end
+				
+			end
+		end
 	end
 end
 
@@ -511,14 +549,12 @@ function _C:__onRemoveMenu()
 end
 
 function _C:__displayNotification(text)
-	print("running __displayNotification")
 	if self.currentState[NOTIFICATION_VISIBLE] then
 		table.insert(self.notificationQueue, text)
 		return
 	elseif #self.notificationQueue == 0 then
 		-- if there's no queue, then this is the first notification queued
 		-- registering listener for all notifications cleared
-		print("registering allNotificationsCleared")
 		LLDispatcher.registerEventListener(self, "allNotificationsCleared")
 	end
 
@@ -546,7 +582,6 @@ function _C:__onClearNotification()
 	self.currentState[NOTIFICATION_VISIBLE] = nil
 
 	-- if there are still notifications to display, go right on to the next one
-	print("queued notifications",#self.notificationQueue)
 	if #self.notificationQueue > 0 then
 		k, text = next(self.notificationQueue)
 		self:__displayNotification(text)
@@ -565,9 +600,6 @@ end
 --------------------------------------------------------------------
 
 function _C:__onScreenTouched()
-	for k,v in pairs(self.currentState) do
-		print("state",k,v)
-	end
 	if self.currentState[CHARACTER_SPEAKING] then
 		self:__advanceBox(self.speakerTextTextbox, "nodeTextFinished")
 	elseif self.currentState[NOTIFICATION_VISIBLE] then
@@ -584,9 +616,9 @@ function _C:__advanceBox(box, callback, noSpool)
 	-- completion.
 	--------------------------------------------------------------------
 	if box:isBusy() then
-		--box:stop()
-		--box:revealAll()
-		box:scroll()
+		box:stop()
+		box:revealAll()
+		--box:scroll()
 	elseif box:more() then
 		box:nextPage()
 		if noSpool then
@@ -644,14 +676,13 @@ function _C:__onNodeTextFinished()
 		self:__setNodeStats(self.currentNode)
 	end
 
-	if self.currentNode.exitAction then
-		self:__exitActions(self.currentNode)
-	end
+	-- if self.currentNode.exitAction then
+	-- 	self:__exitActions(self.currentNode)
+	-- end
 
 	if self.currentNode.choices then
 		self:__displayChoices()
 	elseif not self.currentState[NOTIFICATION_VISIBLE] then
-		print("notification not visible, exiting node")
 		self:__exitNode()
 	end
 end
@@ -667,7 +698,6 @@ function _C:__exitNode()
 	elseif self.currentNode.goToConv then
 		self.__goToConversation(self, self.currentNode.goToConv.file , self.currentNode.goToConv.node)
 	else
-		print("going to next node")
 		self:__goToNode(self:__nextNode(self.currentNodeKey))
 	end
 end

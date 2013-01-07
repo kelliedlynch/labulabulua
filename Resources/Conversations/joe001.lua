@@ -1,7 +1,7 @@
 local _C = {
 	default = {
 		speaker = "Joe",
-		portrait = "joe001portrait.png",
+		portrait = {"joe001portrait.png",},
 		background = "room003.png",
 		text = "default text",
 		music = "potion_shop.ogg",
@@ -28,7 +28,7 @@ local _C = {
 	[4] = {
 		boxStyle = "thought",
 		speaker = Player.name,
-		portrait = "",
+		portrait = {},
 		text = "What am I going to do with this?",
 		goToConv = { 
 			file = "steve001", 
